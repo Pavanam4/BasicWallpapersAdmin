@@ -1,0 +1,433 @@
+/* ═══════════════════════════════════════════════════
+   STRIKE SYSTEM STYLES
+   ═══════════════════════════════════════════════════ */
+
+/* Strike badge on gallery cards */
+.strike-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(240, 68, 56, 0.92);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 100, 100, 0.4);
+  color: #fff;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  z-index: 3;
+  animation: pulseBadge 2s ease-in-out infinite;
+}
+
+@keyframes pulseBadge {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(240, 68, 56, 0.4); }
+  50%       { box-shadow: 0 0 0 4px rgba(240, 68, 56, 0); }
+}
+
+/* Struck gallery card overlay */
+.gallery-card.is-struck {
+  border-color: rgba(240, 68, 56, 0.3);
+}
+
+.gallery-card.is-struck .gallery-thumb-container::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(240, 68, 56, 0.08);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Strike button in gallery card footer */
+.gallery-strike-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.gallery-strike-btn:hover {
+  color: #f79009;
+  background: rgba(247, 144, 9, 0.1);
+}
+
+.gallery-strike-btn.active-strike {
+  color: var(--danger);
+}
+
+/* ── Strike Modal ─────────────────────────────────── */
+.strike-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 5, 8, 0.88);
+  backdrop-filter: blur(8px);
+  z-index: 500;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.strike-modal-overlay.active {
+  display: flex;
+}
+
+.strike-modal {
+  background: #111116;
+  border: 1px solid rgba(240, 68, 56, 0.2);
+  border-radius: 20px;
+  width: 90%;
+  max-width: 520px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(240, 68, 56, 0.06);
+  animation: slideUp 0.3s ease;
+  overflow: hidden;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(24px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.strike-modal-header {
+  background: linear-gradient(135deg, rgba(240, 68, 56, 0.12), rgba(240, 68, 56, 0.04));
+  border-bottom: 1px solid rgba(240, 68, 56, 0.15);
+  padding: 24px 28px 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.strike-modal-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: rgba(240, 68, 56, 0.12);
+  border: 1px solid rgba(240, 68, 56, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.strike-modal-title h3 {
+  font-family: var(--font-title);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.strike-modal-target {
+  font-size: 0.82rem;
+  color: var(--danger-hover);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.strike-modal-body {
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Intensity selector cards */
+.intensity-selector {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.intensity-card {
+  border: 1.5px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 10px 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  background: rgba(255, 255, 255, 0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+}
+
+.intensity-card:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.04);
+  transform: translateY(-2px);
+}
+
+.intensity-card.selected {
+  border-color: var(--intensity-color, var(--primary));
+  background: rgba(var(--intensity-rgb, 127, 86, 217), 0.08);
+  box-shadow: 0 0 12px rgba(var(--intensity-rgb, 127, 86, 217), 0.15);
+}
+
+.intensity-card .i-icon  { font-size: 1.3rem; }
+.intensity-card .i-name  { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.intensity-card .i-dur   { font-size: 0.6rem; color: var(--text-muted); }
+
+/* per-level colors */
+.intensity-card[data-level="warning"] { --intensity-color: #53b1fd; --intensity-rgb: 83,177,253; }
+.intensity-card[data-level="low"]     { --intensity-color: #f79009; --intensity-rgb: 247,144,9; }
+.intensity-card[data-level="medium"]  { --intensity-color: #ee6c4d; --intensity-rgb: 238,108,77; }
+.intensity-card[data-level="high"]    { --intensity-color: var(--danger); --intensity-rgb: 240,68,56; }
+.intensity-card[data-level="permanent"] { --intensity-color: #7a0000; --intensity-rgb: 122,0,0; }
+
+.intensity-card[data-level="warning"].selected  { color: #53b1fd; }
+.intensity-card[data-level="low"].selected      { color: #f79009; }
+.intensity-card[data-level="medium"].selected   { color: #ee6c4d; }
+.intensity-card[data-level="high"].selected     { color: var(--danger); }
+.intensity-card[data-level="permanent"].selected { color: #f55; }
+
+/* Duration row (shown for low/medium only) */
+.duration-row {
+  display: none;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.duration-row.visible { display: flex; }
+
+/* Strike modal footer */
+.strike-modal-footer {
+  padding: 20px 28px;
+  border-top: 1px solid var(--border-panel);
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.btn-strike-confirm {
+  background: var(--danger);
+  color: #fff;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-family: var(--font-main);
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-strike-confirm:hover { background: #c0392b; box-shadow: 0 4px 14px rgba(240,68,56,0.4); }
+.btn-strike-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Strikes Tab Layout ───────────────────────────── */
+.strikes-stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.strike-stat-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-panel);
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.strike-stat-card .stat-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.strike-stat-card .stat-value {
+  font-family: var(--font-title);
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.strike-stat-card.danger-stat .stat-value { color: var(--danger); }
+.strike-stat-card.warn-stat   .stat-value { color: #f79009; }
+.strike-stat-card.perm-stat   .stat-value { color: #f55; }
+.strike-stat-card.normal-stat .stat-value { color: var(--primary-hover); }
+
+/* Blocked creators panel */
+.blocked-creators-panel {
+  background: var(--bg-panel);
+  border: 1px solid rgba(240, 68, 56, 0.15);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.blocked-creators-panel h3 {
+  font-family: var(--font-title);
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.blocked-creators-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.blocked-creator-row {
+  background: rgba(240, 68, 56, 0.05);
+  border: 1px solid rgba(240, 68, 56, 0.12);
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.blocked-creator-info { display: flex; flex-direction: column; gap: 2px; }
+.blocked-creator-name { font-weight: 600; font-size: 0.95rem; }
+
+.blocked-creator-meta {
+  font-size: 0.77rem;
+  color: var(--text-muted);
+  display: flex;
+  gap: 12px;
+}
+
+.blocked-creator-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+/* Strikes history table */
+.strikes-table-panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-panel);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.strikes-table-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-panel);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.strikes-table-header h3 {
+  font-family: var(--font-title);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.strikes-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.87rem;
+}
+
+.strikes-table th {
+  padding: 12px 20px;
+  text-align: left;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-panel);
+  background: rgba(0,0,0,0.15);
+}
+
+.strikes-table td {
+  padding: 14px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  vertical-align: middle;
+}
+
+.strikes-table tr:last-child td { border-bottom: none; }
+.strikes-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+/* Intensity pill badges */
+.intensity-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.intensity-pill.warning  { background: rgba(83,177,253,0.1);  color: #53b1fd; border: 1px solid rgba(83,177,253,0.2); }
+.intensity-pill.low      { background: rgba(247,144,9,0.1);   color: #f79009; border: 1px solid rgba(247,144,9,0.2); }
+.intensity-pill.medium   { background: rgba(238,108,77,0.1);  color: #ee6c4d; border: 1px solid rgba(238,108,77,0.2); }
+.intensity-pill.high     { background: rgba(240,68,56,0.1);   color: var(--danger); border: 1px solid rgba(240,68,56,0.2); }
+.intensity-pill.permanent { background: rgba(122,0,0,0.2);   color: #f55;    border: 1px solid rgba(200,0,0,0.3); }
+
+/* Revoke strike button */
+.btn-revoke {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.08);
+  color: var(--text-secondary);
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.btn-revoke:hover { background: rgba(16,185,129,0.1); border-color: var(--success); color: var(--success); }
+
+/* Empty strikes state */
+.strikes-empty {
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.strikes-empty .empty-icon { font-size: 2.5rem; opacity: 0.5; }
+
+/* Permanent ban warning in modal */
+.perm-ban-warning {
+  background: rgba(122, 0, 0, 0.12);
+  border: 1px solid rgba(200, 0, 0, 0.25);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 0.82rem;
+  color: #f99;
+  display: none;
+  gap: 10px;
+  align-items: flex-start;
+  line-height: 1.5;
+}
+
+.perm-ban-warning.visible { display: flex; }

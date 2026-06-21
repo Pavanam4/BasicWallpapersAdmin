@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Basic Wallpaper - Community Admin Portal</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="strike-styles.css">
+
+  <!-- Supabase JS Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.8/dist/umd/supabase.js"></script>
+  <!-- AWS SDK (for Cloudflare R2 uploads) -->
+  <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1363.0.min.js"></script>
+</head>
+<body>
+
+  <!-- App Container -->
+  <div class="app-container">
+    
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="url(#brand-grad)" stroke="#7F56D9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 17L12 22L22 17" stroke="#7F56D9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 12L12 17L22 12" stroke="#7F56D9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <defs>
+              <linearGradient id="brand-grad" x1="2" y1="2" x2="22" y2="12" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#7F56D9"/>
+                <stop offset="1" stop-color="#98A2B3"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <div class="brand-details">
+          <h1>Basic Wallpaper</h1>
+          <span>Admin Portal</span>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <button class="nav-btn active" id="btn-tab-upload" onclick="switchTab('upload')">
+          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+          Bulk Upload
+        </button>
+        <button class="nav-btn" id="btn-tab-gallery" onclick="switchTab('gallery')">
+          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          Manage Gallery
+        </button>
+        <button class="nav-btn" id="btn-tab-strikes" onclick="switchTab('strikes')" style="position:relative">
+          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Strikes &amp; Bans
+          <span id="active-strikes-badge" style="display:none;background:#f04438;color:#fff;font-size:0.6rem;font-weight:700;padding:2px 6px;border-radius:10px;margin-left:auto;">0</span>
+        </button>
+        <button class="nav-btn" id="btn-tab-settings" onclick="switchTab('settings')">
+          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Storage Settings
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="version">System Version 1.0</div>
+        <div class="developer-tag">Designed for Pavan Am</div>
+      </div>
+    </aside>
+
+    <!-- Main Content Panel -->
+    <main class="main-content">
+      
+      <!-- Top Header Bar -->
+      <header class="top-header">
+        <div class="header-title">
+          <h2 id="current-tab-title">Bulk Upload Wallpapers</h2>
+          <p id="current-tab-subtitle">Drag, configure, and batch upload premium live wallpapers</p>
+        </div>
+        <div class="status-indicators">
+          <div class="status-badge status-supabase" id="supabase-status-badge">
+            <span class="status-dot offline"></span>
+            Supabase
+          </div>
+          <div class="status-badge status-r2" id="r2-status-badge">
+            <span class="status-dot offline"></span>
+            Cloudflare R2
+          </div>
+        </div>
+      </header>
+
+      <!-- Content Views -->
+      <div class="content-view-container">
+
+        <!-- 1. BULK UPLOAD TAB -->
+        <section class="tab-content active" id="tab-upload">
+          
+          <!-- Control Panel -->
+          <div class="control-row">
+            <!-- Storage Selector -->
+            <div class="glass-panel storage-selector-panel">
+              <h3>Upload Destination</h3>
+              <div class="destination-toggle-group">
+                <button class="toggle-btn active" id="dest-supabase" onclick="setDestination('supabase')">
+                  <span class="btn-icon">⚡</span>
+                  Supabase Storage
+                </button>
+                <button class="toggle-btn" id="dest-r2" onclick="setDestination('r2')">
+                  <span class="btn-icon">☁️</span>
+                  Cloudflare R2
+                </button>
+              </div>
+            </div>
+
+            <!-- Global Metadata (Bulk Edit) -->
+            <div class="glass-panel bulk-edit-panel">
+              <div class="panel-header-action">
+                <h3>Bulk Edit Metadata</h3>
+                <span class="hint">Apply fields to all items in queue</span>
+              </div>
+              <div class="form-grid">
+                <div class="input-group">
+                  <label for="bulk-creator">Creator Name</label>
+                  <input type="text" id="bulk-creator" placeholder="e.g. Pavan Am">
+                </div>
+                <div class="input-group">
+                  <label for="bulk-category">Category</label>
+                  <select id="bulk-category" style="background: rgba(255, 255, 255, 0.05); color: #fff; border: 1px solid var(--border-panel); border-radius: 6px; padding: 10px; font-family: inherit; font-size: 14px; outline: none; transition: border-color 0.2s; color-scheme: dark;">
+                    <option value="">-- No Change --</option>
+                    <option value="General">General</option>
+                    <option value="Games">Games</option>
+                    <option value="Anime">Anime</option>
+                    <option value="Cars">Cars</option>
+                    <option value="Nature">Nature</option>
+                    <option value="Super Heroes">Super Heroes</option>
+                  </select>
+                </div>
+                <div class="input-group">
+                  <label for="bulk-tags">Tags (comma-separated)</label>
+                  <input type="text" id="bulk-tags" placeholder="e.g. 4k, dark, loop, anime">
+                </div>
+                <div class="input-group">
+                  <label for="bulk-desc">Description</label>
+                  <input type="text" id="bulk-desc" placeholder="e.g. Premium cinematic live loop.">
+                </div>
+              </div>
+              <div class="panel-footer">
+                <button class="btn btn-secondary" onclick="applyBulkMetadata()">Apply to All Queue</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Drag and Drop Area -->
+          <div class="drop-zone" id="drop-zone">
+            <input type="file" id="file-input" multiple accept="video/*,image/*" class="file-input-hidden">
+            <div class="drop-zone-content">
+              <div class="drop-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+              </div>
+              <h3>Drag & Drop video or image files</h3>
+              <p>Supports MP4, WebM, MKV, JPG, PNG, WEBP files (Max video size: 150MB)</p>
+              <button class="btn btn-primary" onclick="document.getElementById('file-input').click()">Browse Files</button>
+            </div>
+          </div>
+
+          <!-- Upload Queue List -->
+          <div class="queue-section" id="queue-section" style="display: none;">
+            <div class="queue-header">
+              <h3>Upload Queue (<span id="queue-count">0</span> files)</h3>
+              <div class="queue-actions">
+                <button class="btn btn-danger" onclick="clearQueue()">Clear Queue</button>
+                <button class="btn btn-primary btn-glow" id="start-upload-btn" onclick="startBatchUpload()">🚀 Start Batch Upload</button>
+              </div>
+            </div>
+
+            <!-- Upload Queue Grid -->
+            <div class="queue-grid" id="queue-grid">
+              <!-- Queue cards inserted dynamically -->
+            </div>
+          </div>
+
+        </section>
+
+        <!-- 2. MANAGE GALLERY TAB -->
+        <section class="tab-content" id="tab-gallery">
+          
+          <!-- Search & Filters -->
+          <div class="glass-panel filter-panel">
+            <div class="search-row">
+              <div class="search-input-wrapper">
+                <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" id="gallery-search" placeholder="Search wallpapers by title, creator, tags..." oninput="filterGallery()">
+              </div>
+              <select id="gallery-type-filter" onchange="filterGallery()">
+                <option value="all">All Formats</option>
+                <option value="video">Videos Only</option>
+                <option value="image">Images Only</option>
+              </select>
+              <select id="gallery-category-filter" onchange="filterGallery()">
+                <option value="all">All Categories</option>
+                <option value="General">General</option>
+                <option value="Games">Games</option>
+                <option value="Anime">Anime</option>
+                <option value="Cars">Cars</option>
+                <option value="Nature">Nature</option>
+                <option value="Super Heroes">Super Heroes</option>
+              </select>
+              <button class="btn btn-secondary" onclick="fetchCommunityWallpapers()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                Refresh
+              </button>
+            </div>
+          </div>
+
+          <!-- Loading State -->
+          <div class="gallery-loading" id="gallery-loading">
+            <div class="spinner"></div>
+            <p>Fetching community wallpapers from Supabase...</p>
+          </div>
+
+          <!-- Empty State -->
+          <div class="gallery-empty" id="gallery-empty" style="display: none;">
+            <div class="empty-icon">🎴</div>
+            <h3>No Wallpapers Found</h3>
+            <p>Try refining your search or upload new wallpapers to get started.</p>
+          </div>
+
+          <!-- Gallery Grid -->
+          <div class="gallery-grid" id="gallery-grid" style="display: none;">
+            <!-- Gallery cards inserted dynamically -->
+          </div>
+
+        </section>
+
+        <!-- 3. STORAGE SETTINGS TAB -->
+        <section class="tab-content" id="tab-settings">
+          <div class="settings-grid">
+            
+            <!-- Cloudflare R2 Credentials -->
+            <div class="glass-panel settings-card">
+              <div class="card-header">
+                <span class="provider-logo">☁️</span>
+                <div>
+                  <h3>Cloudflare R2 Configuration</h3>
+                  <p>Configure S3-compatible credentials for video and image hosting</p>
+                </div>
+              </div>
+              <div class="form-container">
+                <div class="input-group">
+                  <label for="r2-account-id">Cloudflare Account ID</label>
+                  <input type="password" id="r2-account-id" placeholder="Enter Account ID">
+                </div>
+                <div class="input-group">
+                  <label for="r2-access-key">Access Key ID</label>
+                  <input type="password" id="r2-access-key" placeholder="Enter Access Key ID">
+                </div>
+                <div class="input-group">
+                  <label for="r2-secret-key">Secret Access Key</label>
+                  <input type="password" id="r2-secret-key" placeholder="Enter Secret Access Key">
+                </div>
+                <div class="input-row">
+                  <div class="input-group">
+                    <label for="r2-bucket">Bucket Name</label>
+                    <input type="text" id="r2-bucket" placeholder="e.g. basic-wallpapers">
+                  </div>
+                  <div class="input-group">
+                    <label for="r2-region">R2 Region</label>
+                    <input type="text" id="r2-region" value="auto" placeholder="e.g. auto">
+                  </div>
+                </div>
+                <div class="input-group">
+                  <label for="r2-custom-domain">Public URL Custom Domain / Dev Subdomain</label>
+                  <input type="text" id="r2-custom-domain" placeholder="e.g. https://pub-xxxx.r2.dev or https://wallpapers.domain.com">
+                  <span class="input-hint">Make sure to include http:// or https:// (no trailing slash)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Supabase Connection Config -->
+            <div class="glass-panel settings-card">
+              <div class="card-header">
+                <span class="provider-logo">⚡</span>
+                <div>
+                  <h3>Supabase Configuration</h3>
+                  <p>Database & fallback storage engine configurations</p>
+                </div>
+              </div>
+              <div class="form-container">
+                <div class="input-group">
+                  <label for="supabase-url">Supabase Project URL</label>
+                  <input type="text" id="supabase-url" placeholder="https://xxxx.supabase.co">
+                </div>
+                <div class="input-group">
+                  <label for="supabase-anon-key">Anon / API Key</label>
+                  <input type="password" id="supabase-anon-key" placeholder="Paste Supabase key">
+                </div>
+                <div class="input-row">
+                  <div class="input-group">
+                    <label for="supabase-wallpapers-bucket">Wallpapers Bucket</label>
+                    <input type="text" id="supabase-wallpapers-bucket" value="wallpapers">
+                  </div>
+                  <div class="input-group">
+                    <label for="supabase-thumbnails-bucket">Thumbnails Bucket</label>
+                    <input type="text" id="supabase-thumbnails-bucket" value="thumbnails">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Save Row -->
+          <div class="settings-actions">
+            <button class="btn btn-secondary" onclick="testAllConnections()">Test API Connections</button>
+            <button class="btn btn-primary" onclick="saveSettings()">Save Storage Settings</button>
+          </div>
+
+        </section>
+
+        <!-- 4. STRIKES & BANS TAB -->
+        <section class="tab-content" id="tab-strikes">
+
+          <!-- Stats Row -->
+          <div class="strikes-stats-row">
+            <div class="strike-stat-card normal-stat">
+              <span class="stat-label">Total Strikes</span>
+              <span class="stat-value" id="stat-total">—</span>
+            </div>
+            <div class="strike-stat-card warn-stat">
+              <span class="stat-label">Active Blocks</span>
+              <span class="stat-value" id="stat-active">—</span>
+            </div>
+            <div class="strike-stat-card perm-stat">
+              <span class="stat-label">Permanent Bans</span>
+              <span class="stat-value" id="stat-perm">—</span>
+            </div>
+            <div class="strike-stat-card danger-stat">
+              <span class="stat-label">Struck Wallpapers</span>
+              <span class="stat-value" id="stat-struck">—</span>
+            </div>
+          </div>
+
+          <!-- Blocked Creators Panel -->
+          <div class="blocked-creators-panel">
+            <h3>🚫 Currently Blocked Creators</h3>
+            <div class="blocked-creators-list" id="blocked-creators-list">
+              <p style="color:var(--text-muted);font-size:0.85rem;">Loading...</p>
+            </div>
+          </div>
+
+          <!-- Strike History Table -->
+          <div class="strikes-table-panel">
+            <div class="strikes-table-header">
+              <h3>⚠️ Strike History</h3>
+              <button class="btn btn-secondary" style="font-size:0.8rem;padding:8px 16px;" onclick="fetchStrikes()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                Refresh
+              </button>
+            </div>
+            <div id="strikes-table-container">
+              <div class="strikes-empty">
+                <div class="empty-icon">🛡️</div>
+                <p>No strikes issued yet.</p>
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Strike Modal -->
+  <div class="strike-modal-overlay" id="strike-modal-overlay" onclick="closeStrikeModal()">
+    <div class="strike-modal" onclick="event.stopPropagation()">
+      <div class="strike-modal-header">
+        <div class="strike-modal-icon">⚠️</div>
+        <div class="strike-modal-title">
+          <h3>Issue Copyright Strike</h3>
+          <div class="strike-modal-target" id="strike-target-label">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span id="strike-creator-display">Creator Name</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="strike-modal-body">
+        <!-- Intensity Selector -->
+        <div class="input-group">
+          <label>Strike Intensity</label>
+          <div class="intensity-selector">
+            <div class="intensity-card" data-level="warning" onclick="selectIntensity('warning')">
+              <span class="i-icon">💬</span>
+              <span class="i-name">Warning</span>
+              <span class="i-dur">No block</span>
+            </div>
+            <div class="intensity-card" data-level="low" onclick="selectIntensity('low')">
+              <span class="i-icon">⏱️</span>
+              <span class="i-name">Low</span>
+              <span class="i-dur">1–7 days</span>
+            </div>
+            <div class="intensity-card" data-level="medium" onclick="selectIntensity('medium')">
+              <span class="i-icon">🔒</span>
+              <span class="i-name">Medium</span>
+              <span class="i-dur">7–30 days</span>
+            </div>
+            <div class="intensity-card" data-level="high" onclick="selectIntensity('high')">
+              <span class="i-icon">🚫</span>
+              <span class="i-name">High</span>
+              <span class="i-dur">90 days</span>
+            </div>
+            <div class="intensity-card" data-level="permanent" onclick="selectIntensity('permanent')">
+              <span class="i-icon">☠️</span>
+              <span class="i-name">Permanent</span>
+              <span class="i-dur">Forever</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Duration row (low/medium only) -->
+        <div class="duration-row" id="duration-row">
+          <div class="input-group" style="flex:1">
+            <label for="strike-duration-value">Block Duration</label>
+            <input type="number" id="strike-duration-value" min="1" max="365" value="3" placeholder="e.g. 7">
+          </div>
+          <div class="input-group" style="flex:1">
+            <label for="strike-duration-unit">Unit</label>
+            <select id="strike-duration-unit">
+              <option value="hours">Hours</option>
+              <option value="days" selected>Days</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Reason -->
+        <div class="input-group">
+          <label for="strike-reason">Reason</label>
+          <select id="strike-reason">
+            <option value="Nudity or Sexual Content">Nudity or Sexual Content</option>
+            <option value="Copyright Violation">Copyright Violation</option>
+            <option value="Violence or Graphic Content">Violence or Graphic Content</option>
+            <option value="Spam or Misleading Content">Spam or Misleading Content</option>
+            <option value="Hate Speech">Hate Speech</option>
+            <option value="Low Quality / Blurred Content">Low Quality / Blurred Content</option>
+            <option value="Other Policy Violation">Other Policy Violation</option>
+          </select>
+        </div>
+
+        <!-- Notes -->
+        <div class="input-group">
+          <label for="strike-notes">Admin Notes (optional)</label>
+          <textarea id="strike-notes" rows="2" placeholder="Internal notes for this strike..."
+            style="resize:vertical;min-height:64px;"></textarea>
+        </div>
+
+        <!-- Permanent ban warning -->
+        <div class="perm-ban-warning" id="perm-ban-warning">
+          <span style="font-size:1.2rem;flex-shrink:0;">☠️</span>
+          <span><strong>Permanent Ban</strong> will immediately delete this wallpaper and permanently prevent this creator from uploading. This action cannot be reversed without manual database access.</span>
+        </div>
+      </div>
+
+      <div class="strike-modal-footer">
+        <button class="btn btn-secondary" onclick="closeStrikeModal()">Cancel</button>
+        <button class="btn-strike-confirm" id="strike-confirm-btn" onclick="submitStrike()" disabled>
+          ⚠️ Issue Strike
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Video Playback Modal -->
+  <div class="modal" id="preview-modal" onclick="closePreviewModal()">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="closePreviewModal()">&times;</button>
+      <div class="modal-video-wrapper">
+        <video id="modal-video" controls autoplay loop muted></video>
+        <img id="modal-image" style="display: none; width: 100%; height: auto; border-radius: 8px;">
+      </div>
+      <div class="modal-info">
+        <h3 id="modal-title">Wallpaper Title</h3>
+        <p id="modal-desc">Wallpaper Description</p>
+        <div class="modal-tags" id="modal-tags"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Change Thumbnail Modal -->
+  <div class="modal" id="thumbnail-modal" onclick="closeThumbnailModal()">
+    <div class="modal-content" onclick="event.stopPropagation()" style="max-width: 600px; padding: 28px; text-align: left; background: #0c0c14; border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.7);">
+      <button class="modal-close" onclick="closeThumbnailModal()">&times;</button>
+      <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.4rem; font-weight: 700; margin: 0 0 6px 0; color: #fff;">Regenerate Thumbnail</h3>
+      <p style="font-size: 0.85rem; color: #a1a1aa; margin: 0 0 20px 0; font-family: 'Inter', sans-serif; line-height: 1.5;">Play or scrub the video to find the exact frame you want to use as the thumbnail, then click <strong>Capture & Save</strong>.</p>
+      
+      <div class="modal-video-wrapper" style="position: relative; aspect-ratio: 16/9; background: #000; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 24px;">
+        <video id="thumb-capture-video" style="width: 100%; height: 100%; object-fit: contain;" controls crossOrigin="anonymous"></video>
+      </div>
+
+      <div style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button class="btn" onclick="closeThumbnailModal()" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #fff; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 0.85rem; font-weight: 600;">Cancel</button>
+        <button class="btn" onclick="captureAndSaveThumbnail()" style="background: linear-gradient(135deg, #00c2ff, #c084fc); border: none; color: #000; font-weight: 700; padding: 10px 24px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-family: inherit; font-size: 0.85rem;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+          Capture & Save
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right-Click Context Menu for Wallpaper Category Modification -->
+  <div id="gallery-context-menu" class="gallery-context-menu">
+    <div class="gallery-context-menu-header">Change Category</div>
+    <div class="gallery-context-menu-item" onclick="selectCtxCategory('General')">General</div>
+    <div class="gallery-context-menu-item" onclick="selectCtxCategory('Games')">Games</div>
+    <div class="gallery-context-menu-item" onclick="selectCtxCategory('Anime')">Anime</div>
+    <div class="gallery-context-menu-item" onclick="selectCtxCategory('Cars')">Cars</div>
+    <div class="gallery-context-menu-item" onclick="selectCtxCategory('Nature')">Nature</div>
+    <div class="gallery-context-menu-item" onclick="selectCtxCategory('Super Heroes')">Super Heroes</div>
+    <div class="dropdown-divider" id="gallery-context-divider" style="height: 1px; background: rgba(255,255,255,0.08); margin: 6px 0;"></div>
+    <div class="gallery-context-menu-item" id="gallery-context-change-thumb" onclick="openThumbnailModalOption()" style="color: var(--accent, #00c2ff); font-weight: 600;">📸 Change Thumbnail</div>
+  </div>
+
+  <!-- Toast Notification System -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- App Script -->
+  <script src="app.js"></script>
+</body>
+</html>
