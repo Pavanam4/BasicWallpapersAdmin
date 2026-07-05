@@ -1,3 +1,204 @@
+// Supabase to Firebase Firestore/Storage Compatibility Wrapper
+class SupabaseToFirestoreCompat {
+  constructor(db, storage) {
+    this.db = db;
+    this.storage = storage;
+  }
+  
+  from(tableName) {
+    return new FirestoreQueryBuilder(this.db, this.storage, tableName);
+  }
+  
+  get auth() {
+    return {
+      signUp: async (credentials) => {
+        try {
+          const userCredential = await firebase.auth().createUserWithEmailAndPassword(credentials.email, credentials.password);
+          return { data: { user: userCredential.user }, error: null };
+        } catch (e) {
+          return { data: null, error: e };
+        }
+      },
+      signIn: async (credentials) => {
+        try {
+          const userCredential = await firebase.auth().signInWithEmailAndPassword(credentials.email, credentials.password);
+          return { data: { user: userCredential.user }, error: null };
+        } catch (e) {
+          return { data: null, error: e };
+        }
+      }
+    };
+  }
+
+  get storage() {
+    return {
+      from: (bucketName) => {
+        return {
+          upload: async (fileName, fileData) => {
+            try {
+              const url = `${settings.supabaseUrl}/storage/v1/object/${bucketName}/${fileName}`;
+              const mimeType = fileName.endsWith('.mp4') ? 'video/mp4' : 'image/jpeg';
+              const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                  'apikey': settings.supabaseKey,
+                  'Authorization': `Bearer ${settings.supabaseKey}`,
+                  'Content-Type': mimeType
+                },
+                body: fileData
+              });
+              if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(errText);
+              }
+              const data = await response.json();
+              return { data, error: null };
+            } catch (e) {
+              return { data: null, error: e };
+            }
+          },
+          getPublicUrl: (fileName) => {
+            const publicUrl = `${settings.supabaseUrl}/storage/v1/object/public/${bucketName}/${fileName}`;
+            return { data: { publicUrl } };
+          },
+          remove: async (fileNames) => {
+            try {
+              const url = `${settings.supabaseUrl}/storage/v1/object/${bucketName}`;
+              const response = await fetch(url, {
+                method: 'DELETE',
+                headers: {
+                  'apikey': settings.supabaseKey,
+                  'Authorization': `Bearer ${settings.supabaseKey}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ prefixes: fileNames })
+              });
+              if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(errText);
+              }
+              const data = await response.json();
+              return { data, error: null };
+            } catch (e) {
+              return { data: null, error: e };
+            }
+          }
+        };
+      }
+    };
+  }
+}
+
+class FirestoreQueryBuilder {
+  constructor(db, storage, tableName) {
+    this.db = db;
+    this.storage = storage;
+    this.tableName = tableName;
+    this.query = db.collection(tableName);
+    this.filters = [];
+    this.orderField = null;
+    this.orderAscending = true;
+    this.limitVal = null;
+  }
+
+  select(fields = '*') {
+    return this;
+  }
+
+  eq(field, value) {
+    this.query = this.query.where(field, '==', value);
+    return this;
+  }
+
+  neq(field, value) {
+    this.query = this.query.where(field, '!=', value);
+    return this;
+  }
+
+  limit(val) {
+    this.limitVal = val;
+    return this;
+  }
+
+  order(field, options = {}) {
+    this.orderField = field;
+    this.orderAscending = options.ascending !== false;
+    return this;
+  }
+
+  async get() {
+    try {
+      let q = this.query;
+      if (this.orderField) {
+        q = q.orderBy(this.orderField, this.orderAscending ? 'asc' : 'desc');
+      }
+      if (this.limitVal !== null) {
+        q = q.limit(this.limitVal);
+      }
+      const snapshot = await q.get();
+      const data = [];
+      snapshot.forEach(doc => {
+        data.push({ id: doc.id, ...doc.data() });
+      });
+      return { data, error: null };
+    } catch (e) {
+      console.error("Firestore get error:", e);
+      return { data: null, error: e };
+    }
+  }
+
+  async insert(rows) {
+    try {
+      const dataList = Array.isArray(rows) ? rows : [rows];
+      const inserted = [];
+      for (const row of dataList) {
+        const docId = row.id || Math.random().toString(36).substring(2, 11) + '_' + Date.now();
+        const dataToSave = { ...row };
+        delete dataToSave.id;
+        if (!dataToSave.created_at) {
+          dataToSave.created_at = new Date().toISOString();
+        }
+        await this.db.collection(this.tableName).doc(docId).set(dataToSave);
+        inserted.push({ id: docId, ...dataToSave });
+      }
+      return { data: inserted, error: null };
+    } catch (e) {
+      console.error("Firestore insert error:", e);
+      return { data: null, error: e };
+    }
+  }
+
+  async update(row) {
+    try {
+      const snapshot = await this.query.get();
+      const promises = [];
+      snapshot.forEach(doc => {
+        promises.push(doc.ref.update(row));
+      });
+      await Promise.all(promises);
+      return { data: {}, error: null };
+    } catch (e) {
+      console.error("Firestore update error:", e);
+      return { data: null, error: e };
+    }
+  }
+
+  async delete() {
+    try {
+      const snapshot = await this.query.get();
+      const promises = [];
+      snapshot.forEach(doc => {
+        promises.push(doc.ref.delete());
+      });
+      await Promise.all(promises);
+      return { data: {}, error: null };
+    } catch (e) {
+      console.error("Firestore delete error:", e);
+      return { data: null, error: e };
+    }
+  }
+}
+
 // App Constants & State
 let activeTab = 'upload';
 let uploadDestination = 'r2'; // 'supabase' or 'r2'
@@ -19,7 +220,8 @@ const DEFAULT_SETTINGS = {
   r2SecretKey: 'b75a1f08ad503ac809a40560b154d7b058190ba410cd58a061867573946cd066',
   r2Bucket: 'wallpaper-videos-new',   // ← actual bucket with the videos
   r2Region: 'auto',
-  r2CustomDomain: 'https://pub-7650175b10aa4aa8916c6a32f15f32ff.r2.dev'
+  r2CustomDomain: 'https://pub-7650175b10aa4aa8916c6a32f15f32ff.r2.dev',
+  geminiApiKey: ''
 };
 
 
@@ -80,6 +282,7 @@ function loadSettings() {
   document.getElementById('r2-bucket').value = settings.r2Bucket;
   document.getElementById('r2-region').value = settings.r2Region;
   document.getElementById('r2-custom-domain').value = settings.r2CustomDomain;
+  document.getElementById('gemini-api-key').value = settings.geminiApiKey || '';
 
   // Restore active upload destination from preference
   const savedDest = localStorage.getItem('basic_wallpaper_upload_dest');
@@ -101,6 +304,7 @@ function saveSettings() {
   settings.r2Bucket = document.getElementById('r2-bucket').value.trim();
   settings.r2Region = document.getElementById('r2-region').value.trim() || 'auto';
   settings.r2CustomDomain = document.getElementById('r2-custom-domain').value.trim();
+  settings.geminiApiKey = document.getElementById('gemini-api-key').value.trim();
   
   // Format Custom Domain (remove trailing slash if any)
   if (settings.r2CustomDomain && settings.r2CustomDomain.endsWith('/')) {
@@ -119,19 +323,39 @@ async function initClients() {
   updateStatusBadge('supabase', 'offline');
   updateStatusBadge('r2', 'offline');
 
-  // 1. Supabase Initialization
-  if (settings.supabaseUrl && settings.supabaseKey) {
+  // 1. Firebase Initialization
+  const firebaseConfig = {
+    apiKey: "AIzaSyAGWFhd9vm6UepVzaS87s5wVINL9ogym_4",
+    authDomain: "glasscord-58675.firebaseapp.com",
+    projectId: "glasscord-58675",
+    storageBucket: "glasscord-58675.firebasestorage.app",
+    messagingSenderId: "744549879312",
+    appId: "1:744549879312:web:cf9d6d7323092d4099c495",
+    measurementId: "G-Y344B0Z4Y7"
+  };
+
+  if (typeof firebase !== 'undefined' && !firebase.apps.length) {
     try {
-      const { createClient } = supabase;
-      supabaseClient = createClient(settings.supabaseUrl, settings.supabaseKey);
+      firebase.initializeApp(firebaseConfig);
+    } catch (e) {
+      console.warn('Firebase initialization failed:', e.message);
+    }
+  }
+
+  // 1. Supabase Client Initialization
+  if (typeof supabase !== 'undefined' && settings.supabaseUrl && settings.supabaseKey) {
+    try {
+      supabaseClient = supabase.createClient(settings.supabaseUrl, settings.supabaseKey);
       
       // Test Supabase connection
       const { data, error } = await supabaseClient.from('community_wallpapers').select('id').limit(1);
       if (error) throw error;
       updateStatusBadge('supabase', 'online');
+      updateAppealsBadge();
     } catch (e) {
       console.warn('Supabase Client fail:', e.message);
       updateStatusBadge('supabase', 'offline');
+      supabaseClient = null;
     }
   } else {
     supabaseClient = null;
@@ -235,9 +459,21 @@ function switchTab(tabId) {
     title.innerText = 'Strikes & Bans';
     sub.innerText = 'Issue copyright strikes, manage blocked creators, and view strike history';
     fetchStrikes();
+  } else if (tabId === 'reports') {
+    title.innerText = 'User Reports';
+    sub.innerText = 'Review, delete reported wallpapers, and moderate the community';
+    fetchReports();
+  } else if (tabId === 'appeals') {
+    title.innerText = 'Creator Appeals';
+    sub.innerText = 'Review, approve, or reject creator account recovery appeals';
+    fetchAppeals();
   } else if (tabId === 'settings') {
     title.innerText = 'Cloud Storage Settings';
     sub.innerText = 'Configure database nodes, storage buckets, and R2 credentials';
+  } else if (tabId === 'notifications') {
+    title.innerText = 'Send Broadcast Notifications';
+    sub.innerText = 'Manage system alerts and push news directly to active desktop software installations';
+    fetchNotifications();
   }
 }
 
@@ -290,6 +526,14 @@ function setupDragAndDrop() {
   fileInput.addEventListener('change', () => {
     handleUploadedFiles(fileInput.files);
   });
+  
+  // Handle folder picker selection
+  const folderInput = document.getElementById('folder-input');
+  if (folderInput) {
+    folderInput.addEventListener('change', () => {
+      handleUploadedFiles(folderInput.files);
+    });
+  }
 }
 
 // Helper to bind quick tags/bulk configs
@@ -455,6 +699,13 @@ function renderQueueCard(item) {
           </select>
         </div>
         <div class="input-group" style="flex: 1;">
+          <label>Format Type</label>
+          <select style="background: #111116; color: #fff; border: 1px solid var(--border-panel); border-radius: 6px; padding: 10px; font-family: inherit; font-size: 14px; outline: none; transition: border-color 0.2s; color-scheme: dark;" onchange="updateItemField('${item.id}', 'type', this.value); updateCardTypeBadge('${item.id}', this.value)">
+            <option value="video" ${item.type === 'video' ? 'selected' : ''}>Live (Video)</option>
+            <option value="image" ${item.type === 'image' ? 'selected' : ''}>4K Wallpaper (Picture)</option>
+          </select>
+        </div>
+        <div class="input-group" style="flex: 1;">
           <label>Tags (separated by comma)</label>
           <input type="text" value="${item.tags}" placeholder="e.g. dynamic, colorful" oninput="updateItemField('${item.id}', 'tags', this.value)">
         </div>
@@ -610,14 +861,25 @@ function updateItemField(itemId, field, value) {
   }
 }
 
+function updateCardTypeBadge(itemId, value) {
+  const card = document.getElementById(`card-${itemId}`);
+  if (card) {
+    const badge = card.querySelector('.video-badge');
+    if (badge) {
+      badge.textContent = value;
+    }
+  }
+}
+
 // Apply bulk parameters to queue list
 function applyBulkMetadata() {
   const creator = document.getElementById('bulk-creator').value.trim();
   const category = document.getElementById('bulk-category').value;
+  const type = document.getElementById('bulk-type').value;
   const tags = document.getElementById('bulk-tags').value.trim();
   const desc = document.getElementById('bulk-desc').value.trim();
   
-  if (!creator && !category && !tags && !desc) {
+  if (!creator && !category && !type && !tags && !desc) {
     showToast('Please fill in at least one bulk edit field.', 'warning');
     return;
   }
@@ -625,6 +887,7 @@ function applyBulkMetadata() {
   uploadQueue.forEach(item => {
     if (creator) item.creator = creator;
     if (category) item.category = category;
+    if (type) item.type = type;
     if (tags) item.tags = tags;
     if (desc) item.desc = desc;
   });
@@ -635,11 +898,16 @@ function applyBulkMetadata() {
     if (card) {
       const creatorInput = card.querySelector('input[oninput*="creator"]');
       const categorySelect = card.querySelector('select[onchange*="category"]');
+      const typeSelect = card.querySelector('select[onchange*="type"]');
       const tagsInput = card.querySelector('input[oninput*="tags"]');
       const descInput = card.querySelector('input[oninput*="desc"]');
 
       if (creator && creatorInput) creatorInput.value = creator;
       if (category && categorySelect) categorySelect.value = category;
+      if (type && typeSelect) {
+        typeSelect.value = type;
+        updateCardTypeBadge(item.id, type);
+      }
       if (tags && tagsInput) tagsInput.value = tags;
       if (desc && descInput) descInput.value = desc;
     }
@@ -792,6 +1060,8 @@ function disableControlUI(disable) {
   document.querySelectorAll('.capture-slider').forEach(slider => slider.disabled = disable);
   document.querySelectorAll('.destination-toggle-group button').forEach(btn => btn.disabled = disable);
   document.getElementById('file-input').disabled = disable;
+  const folderInput = document.getElementById('folder-input');
+  if (folderInput) folderInput.disabled = disable;
 }
 
 // INDIVIDUAL UPLOAD WORKER
@@ -928,11 +1198,17 @@ async function executeItemUpload(item) {
       user_id: 'admin_portal'
     };
 
+    // Check if the key being used is the anon key
+    const isAnonKey = settings.supabaseKey && settings.supabaseKey.includes('icm9sZSI6ImFub24i'); // base64 for "role":"anon"
+    if (isAnonKey) {
+      throw new Error(`You are using the 'anon' key. Uploading from the admin dashboard requires the 'service_role' key. Please go to Supabase -> Project Settings -> API and copy the service_role secret.`);
+    }
+
     const { error: dbError } = await supabaseClient
       .from('community_wallpapers')
       .insert([dbRecord]);
 
-    if (dbError) throw new Error(`Database save failed: ${dbError.message}`);
+    if (dbError) throw new Error(`Database save failed: ${dbError.message}. Did you use the service_role key?`);
 
     // Completed successfully!
     updateCardStatus(item, 'success', 'Done', 100);
@@ -1031,7 +1307,7 @@ function renderGallery(items = communityWallpapers) {
 
     card.innerHTML = `
       <div class="gallery-thumb-container">
-        <img src="${wp.thumbnail_url || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3C/svg%3E'}" alt="${wp.title}">
+        <img src="${wp.thumbnail_url || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3C/svg%3E'}" alt="${wp.title}" loading="lazy">
         <button class="gallery-play-btn" onclick="openPreviewModal('${wp.file_url}', '${wp.is_video}', '${escapeHtml(wp.title)}', '${escapeHtml(wp.description)}')">
           <svg width="24" height="24" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
         </button>
@@ -1566,92 +1842,241 @@ function autoCategorize(title = '', tags = '', desc = '') {
 // COPYRIGHT STRIKE SYSTEM
 // =====================================================
 
-let currentStrikeTarget = { wallpaperId: null, creator: null, title: null };
+// =====================================================
+// COPYRIGHT STRIKE SYSTEM
+// =====================================================
+
+let currentStrikeTarget = { wallpaperId: null, creator: null, title: null, fileUrl: null, thumbnailUrl: null, reportId: null };
 let selectedIntensity = null;
 
-function openStrikeModal(wallpaperId, creator, title) {
-  currentStrikeTarget = { wallpaperId, creator, title };
-  selectedIntensity = null;
-  document.querySelectorAll('.intensity-card').forEach(c => c.classList.remove('selected'));
-  document.getElementById('duration-row').classList.remove('visible');
+function openStrikeModal(wallpaperId, creator, title, fileUrl = null, thumbnailUrl = null, reportId = null) {
+  currentStrikeTarget = { wallpaperId, creator, title, fileUrl, thumbnailUrl, reportId };
+  
+  // Set defaults in form
+  document.getElementById('strike-duration-preset').value = '2_days';
+  document.getElementById('duration-custom-row').style.display = 'none';
   document.getElementById('perm-ban-warning').classList.remove('visible');
   document.getElementById('strike-notes').value = '';
   document.getElementById('strike-duration-value').value = '3';
   document.getElementById('strike-duration-unit').value = 'days';
-  document.getElementById('strike-confirm-btn').disabled = true;
+  document.getElementById('strike-delete-wallpaper').checked = true; // Default to checked
+  
+  // Reset intensity selector state
+  document.querySelectorAll('.intensity-card').forEach(c => c.classList.remove('selected'));
+  const defaultCard = document.querySelector('.intensity-card[data-level="low"]');
+  if (defaultCard) defaultCard.classList.add('selected');
+  selectedIntensity = 'low';
+
+  document.getElementById('strike-confirm-btn').disabled = false;
   document.getElementById('strike-creator-display').textContent = creator + ' · "' + title + '"';
   document.getElementById('strike-modal-overlay').classList.add('active');
 }
+window.openStrikeModal = openStrikeModal;
 
 function closeStrikeModal() {
   document.getElementById('strike-modal-overlay').classList.remove('active');
-  currentStrikeTarget = { wallpaperId: null, creator: null, title: null };
+  currentStrikeTarget = { wallpaperId: null, creator: null, title: null, fileUrl: null, thumbnailUrl: null, reportId: null };
   selectedIntensity = null;
 }
+window.closeStrikeModal = closeStrikeModal;
+
+function onPresetDurationChange() {
+  const preset = document.getElementById('strike-duration-preset').value;
+  const customRow = document.getElementById('duration-custom-row');
+  const permWarn = document.getElementById('perm-ban-warning');
+  
+  customRow.style.display = 'none';
+  permWarn.classList.remove('visible');
+  
+  let intensity = 'low';
+  
+  if (preset === 'warning') {
+    intensity = 'warning';
+  } else if (preset === '2_days' || preset === '5_days') {
+    intensity = 'low';
+  } else if (preset === '1_month' || preset === '6_months') {
+    intensity = 'medium';
+  } else if (preset === '1_year') {
+    intensity = 'high';
+  } else if (preset === 'permanent') {
+    intensity = 'permanent';
+    permWarn.classList.add('visible');
+  } else if (preset === 'custom') {
+    customRow.style.display = 'flex';
+    intensity = 'medium';
+  }
+  
+  selectedIntensity = intensity;
+  document.querySelectorAll('.intensity-card').forEach(c => c.classList.remove('selected'));
+  const card = document.querySelector(`.intensity-card[data-level="${intensity}"]`);
+  if (card) card.classList.add('selected');
+}
+window.onPresetDurationChange = onPresetDurationChange;
 
 function selectIntensity(level) {
   selectedIntensity = level;
   document.querySelectorAll('.intensity-card').forEach(c => c.classList.remove('selected'));
-  const card = document.querySelector('.intensity-card[data-level="' + level + '"]');
+  const card = document.querySelector(`.intensity-card[data-level="${level}"]`);
   if (card) card.classList.add('selected');
-  const durRow   = document.getElementById('duration-row');
+  
+  const presetSelect = document.getElementById('strike-duration-preset');
+  const customRow = document.getElementById('duration-custom-row');
   const permWarn = document.getElementById('perm-ban-warning');
-  if (level === 'low' || level === 'medium') {
-    durRow.classList.add('visible');
-    document.getElementById('strike-duration-value').value = level === 'low' ? '3' : '14';
-    document.getElementById('strike-duration-unit').value  = 'days';
-  } else {
-    durRow.classList.remove('visible');
-  }
+  
+  customRow.style.display = 'none';
   permWarn.classList.toggle('visible', level === 'permanent');
-  document.getElementById('strike-confirm-btn').disabled = false;
+  
+  // Update preset dropdown based on selected card
+  if (level === 'warning') {
+    presetSelect.value = 'warning';
+  } else if (level === 'low') {
+    presetSelect.value = '2_days';
+  } else if (level === 'medium') {
+    presetSelect.value = '1_month';
+  } else if (level === 'high') {
+    presetSelect.value = '1_year';
+  } else if (level === 'permanent') {
+    presetSelect.value = 'permanent';
+  }
 }
+window.selectIntensity = selectIntensity;
+
+async function executeWallpaperDeletion(id, fileUrl, thumbnailUrl) {
+  // 1. Delete DB record
+  const { error: dbError } = await supabaseClient
+    .from('community_wallpapers')
+    .delete()
+    .eq('id', id);
+
+  if (dbError) throw new Error(`Database deletion failed: ${dbError.message}`);
+
+  // 2. Extract filenames and delete from Storage
+  if (fileUrl) {
+    try {
+      if (fileUrl.includes('supabase.co')) {
+        const mediaFileName = fileUrl.split('/').pop();
+        await supabaseClient.storage.from(settings.supabaseWallpapersBucket).remove([mediaFileName]);
+      } else if (r2Client && fileUrl.includes(settings.r2CustomDomain.replace('https://','').replace('http://',''))) {
+        const key = 'wallpapers/' + fileUrl.split('/wallpapers/')[1];
+        await r2Client.deleteObject({ Key: key }).promise();
+      }
+    } catch (err) {
+      console.warn('Storage media file deletion failed:', err);
+    }
+  }
+
+  if (thumbnailUrl) {
+    try {
+      if (thumbnailUrl.includes('supabase.co') && !thumbnailUrl.includes('assets/logo.png')) {
+        const thumbFileName = thumbnailUrl.split('/').pop();
+        await supabaseClient.storage.from(settings.supabaseThumbnailsBucket).remove([thumbFileName]);
+      } else if (r2Client && thumbnailUrl.includes(settings.r2CustomDomain.replace('https://','').replace('http://',''))) {
+        const key = 'thumbnails/' + thumbnailUrl.split('/thumbnails/')[1];
+        await r2Client.deleteObject({ Key: key }).promise();
+      }
+    } catch (err) {
+      console.warn('Storage thumbnail deletion failed:', err);
+    }
+  }
+}
+window.executeWallpaperDeletion = executeWallpaperDeletion;
 
 async function submitStrike() {
-  if (!selectedIntensity || !currentStrikeTarget.wallpaperId) return;
+  const preset = document.getElementById('strike-duration-preset').value;
+  const reason = document.getElementById('strike-reason').value;
+  const notes = document.getElementById('strike-notes').value.trim();
+  const creator = currentStrikeTarget.creator;
+  const wallpaperId = currentStrikeTarget.wallpaperId;
+  const deleteWallpaperChecked = document.getElementById('strike-delete-wallpaper').checked;
+
+  if (!wallpaperId) return;
+
   const btn = document.getElementById('strike-confirm-btn');
   btn.disabled = true;
   btn.textContent = 'Issuing...';
 
-  const reason      = document.getElementById('strike-reason').value;
-  const notes       = document.getElementById('strike-notes').value.trim();
-  const creator     = currentStrikeTarget.creator;
-  const wallpaperId = currentStrikeTarget.wallpaperId;
-
+  // Calculate intensity and block duration
+  let intensity = selectedIntensity || 'low';
   let blockHours = null;
   let blockUntil = null;
-  if (selectedIntensity === 'low' || selectedIntensity === 'medium') {
-    const val  = parseInt(document.getElementById('strike-duration-value').value, 10) || 1;
+
+  if (preset === 'warning') {
+    intensity = 'warning';
+  } else if (preset === '2_days') {
+    intensity = 'low';
+    blockHours = 2 * 24;
+  } else if (preset === '5_days') {
+    intensity = 'low';
+    blockHours = 5 * 24;
+  } else if (preset === '1_month') {
+    intensity = 'medium';
+    blockHours = 30 * 24;
+  } else if (preset === '6_months') {
+    intensity = 'medium';
+    blockHours = 180 * 24;
+  } else if (preset === '1_year') {
+    intensity = 'high';
+    blockHours = 365 * 24;
+  } else if (preset === 'permanent') {
+    intensity = 'permanent';
+  } else if (preset === 'custom') {
+    const val = parseInt(document.getElementById('strike-duration-value').value, 10) || 1;
     const unit = document.getElementById('strike-duration-unit').value;
-    blockHours = unit === 'hours' ? val : val * 24;
-    blockUntil = new Date(Date.now() + blockHours * 3600 * 1000).toISOString();
-  } else if (selectedIntensity === 'high') {
-    blockHours = 90 * 24;
+    if (unit === 'hours') blockHours = val;
+    else if (unit === 'days') blockHours = val * 24;
+    else if (unit === 'weeks') blockHours = val * 24 * 7;
+    else if (unit === 'months') blockHours = val * 24 * 30;
+  }
+
+  if (blockHours) {
     blockUntil = new Date(Date.now() + blockHours * 3600 * 1000).toISOString();
   }
 
   try {
+    // 1. Insert strike record
     const { error: strikeErr } = await supabaseClient.from('strikes').insert({
-      wallpaper_id: wallpaperId, creator, reason,
-      intensity: selectedIntensity, block_hours: blockHours,
-      block_until: blockUntil, notes: notes || null, is_active: true
+      wallpaper_id: wallpaperId,
+      creator,
+      reason,
+      intensity,
+      block_hours: blockHours,
+      block_until: blockUntil,
+      notes: notes || null,
+      is_active: true
     });
     if (strikeErr) throw strikeErr;
 
-    const markStruck = selectedIntensity !== 'warning';
-    const { error: wpErr } = await supabaseClient
-      .from('community_wallpapers')
-      .update({ is_struck: markStruck, strike_reason: reason })
-      .eq('id', wallpaperId);
-    if (wpErr) throw wpErr;
-
-    if (selectedIntensity === 'permanent') {
-      await supabaseClient.from('community_wallpapers').delete().eq('id', wallpaperId);
+    // 2. Perform deletion if permanent ban or checkbox checked
+    const shouldDelete = (intensity === 'permanent') || deleteWallpaperChecked;
+    if (shouldDelete) {
+      await executeWallpaperDeletion(wallpaperId, currentStrikeTarget.fileUrl, currentStrikeTarget.thumbnailUrl);
+    } else {
+      const markStruck = intensity !== 'warning';
+      const { error: wpErr } = await supabaseClient
+        .from('community_wallpapers')
+        .update({ is_struck: markStruck, strike_reason: reason })
+        .eq('id', wallpaperId);
+      if (wpErr) throw wpErr;
     }
 
-    showToast('Strike issued to "' + creator + '" -- ' + selectedIntensity.toUpperCase(), 'warning');
+    // 3. Clear report if this strike was triggered from a report
+    if (currentStrikeTarget.reportId) {
+      await supabaseClient
+        .from('site_analytics')
+        .delete()
+        .eq('id', currentStrikeTarget.reportId);
+    }
+
+    showToast(`Strike issued successfully!`, 'success');
     closeStrikeModal();
-    await fetchCommunityWallpapers();
+    
+    // Refresh stats & views
+    if (activeTab === 'reports') {
+      fetchReports();
+    } else {
+      fetchCommunityWallpapers();
+    }
+    fetchStrikes();
     updateStrikesBadge();
   } catch (err) {
     showToast('Failed to issue strike: ' + err.message, 'danger');
@@ -1661,6 +2086,7 @@ async function submitStrike() {
     btn.innerHTML = '⚠️ Issue Strike';
   }
 }
+window.submitStrike = submitStrike;
 
 async function fetchStrikes() {
   if (!supabaseClient) return;
@@ -1789,3 +2215,634 @@ async function updateStrikesBadge() {
     }
   } catch (_) {}
 }
+
+// =====================================================
+// USER REPORTS MODERATION
+// =====================================================
+
+function parseReportDetails(pathText) {
+  if (!pathText) return { title: 'Unknown', id: '', owner: 'Unknown', reason: 'Report', details: '' };
+  
+  const titleMatch = pathText.match(/Reported:\s*"([^"]+)"/i);
+  const idMatch = pathText.match(/\(ID:\s*([^)]+)\)/i);
+  const ownerMatch = pathText.match(/by owner\s*([^\.]+)\./i);
+  const reasonMatch = pathText.match(/Reason:\s*([^.]+)\./i);
+  const detailsMatch = pathText.match(/Details:\s*(.*)$/i);
+
+  return {
+    title: titleMatch ? titleMatch[1] : 'Unknown Wallpaper',
+    id: idMatch ? idMatch[1] : '',
+    owner: ownerMatch ? ownerMatch[1] : 'Unknown',
+    reason: reasonMatch ? reasonMatch[1] : 'General Report',
+    details: detailsMatch ? detailsMatch[1] : ''
+  };
+}
+
+function escapeJSString(str) {
+  if (!str) return '';
+  return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+}
+
+async function fetchReports() {
+  const container = document.getElementById('reports-table-container');
+  if (!supabaseClient) {
+    container.innerHTML = '<div class="strikes-empty"><div class="empty-icon">❌</div><p>Supabase client is not initialized. Please verify your connection settings in the Storage Settings tab.</p></div>';
+    return;
+  }
+  
+  container.innerHTML = '<div class="strikes-empty"><div class="empty-icon">⏳</div><p>Loading reports...</p></div>';
+  console.log('Fetching reports from site_analytics table using Supabase:', settings.supabaseUrl);
+
+  try {
+    const { data: events, error } = await supabaseClient
+      .from('site_analytics')
+      .select('*')
+      .eq('event_type', 'wallpaper_report')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    if (!events || events.length === 0) {
+      container.innerHTML = '<div class="strikes-empty"><div class="empty-icon">🛡️</div><p>No reports logged yet.</p></div>';
+      return;
+    }
+
+    // Batch fetch community wallpaper details for the reported IDs to support preview
+    const wpIds = [...new Set(events.map(e => parseReportDetails(e.path).id).filter(id => id))];
+    let wallpapersMap = {};
+    if (wpIds.length > 0) {
+      try {
+        const { data: wpData } = await supabaseClient
+          .from('community_wallpapers')
+          .select('id, file_url, is_video, thumbnail_url, creator')
+          .in('id', wpIds);
+        if (wpData) {
+          wpData.forEach(wp => {
+            wallpapersMap[wp.id] = wp;
+          });
+        }
+      } catch (dbErr) {
+        console.warn('Failed to batch fetch wallpaper details for reports preview:', dbErr);
+      }
+    }
+
+    const rows = events.map(e => {
+      const parsed = parseReportDetails(e.path);
+      const wpDetails = wallpapersMap[parsed.id];
+      const date = new Date(e.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const reporter = e.session_id ? e.session_id.replace(/_/g, '@') : 'guest';
+      
+      const isDeleted = !wpDetails;
+      const fileUrl = wpDetails ? wpDetails.file_url : '';
+      const isVideo = wpDetails ? wpDetails.is_video : false;
+      const thumbUrl = wpDetails ? wpDetails.thumbnail_url : 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3C/svg%3E';
+      const creator = wpDetails ? wpDetails.creator : parsed.owner;
+
+      const reviewBtnHtml = isDeleted 
+        ? `<button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.75rem; opacity: 0.5; cursor: not-allowed;" disabled>👁️ Review</button>`
+        : `<button class="btn btn-primary" style="padding: 6px 12px; font-size: 0.75rem; background: linear-gradient(135deg, #00c2ff, #c084fc); border: none; color: #000;" onclick="openPreviewModal('${fileUrl}', ${isVideo}, '${escapeJSString(parsed.title)}', '${escapeJSString(parsed.details)}')">👁️ Review</button>`;
+
+      const strikeBtnHtml = isDeleted
+        ? `<button class="btn btn-warning" style="padding: 6px 12px; font-size: 0.75rem; opacity: 0.5; cursor: not-allowed;" disabled>⚠️ Strike</button>`
+        : `<button class="btn btn-warning" style="padding: 6px 12px; font-size: 0.75rem; background: #f79009; border: none; color: #fff;" onclick="openStrikeModal('${parsed.id}', '${escapeJSString(creator)}', '${escapeJSString(parsed.title)}', '${fileUrl}', '${thumbUrl}', '${e.id}')">⚠️ Strike</button>`;
+
+      const titleHtml = isDeleted
+        ? `<div style="font-weight: 600; color: #7f8c8d;">${escapeHtml(parsed.title)} <span style="font-size: 0.75rem; font-weight: normal; color: #e74c3c;">(Deleted)</span></div>`
+        : `<div style="font-weight: 600; color: #fff;">${escapeHtml(parsed.title)}</div>`;
+
+      return `<tr>
+        <td>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <img src="${thumbUrl}" style="width: 50px; height: 30px; object-fit: cover; border-radius: 4px; border: 1px solid rgba(255,255,255,0.08);" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'50\\' height=\\'30\\'%3E%3Crect width=\\'100%25\\' height=\\'100%25\\' fill=\\'%23111116\\'/%3E%3C/svg%3E'" />
+            <div>
+              ${titleHtml}
+              <div style="font-size: 0.72rem; color: var(--text-muted); font-family: monospace;">ID: ${parsed.id}</div>
+            </div>
+          </div>
+        </td>
+        <td><span class="badge" style="background: rgba(168, 85, 247, 0.1); color: #c084fc; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px;">👤 ${escapeHtml(creator)}</span></td>
+        <td><span style="font-family: monospace; font-size: 0.8rem; color: #a1a1aa;">${escapeHtml(reporter)}</span></td>
+        <td><span class="badge" style="background: rgba(239, 68, 68, 0.1); color: #f87171; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px;">${escapeHtml(parsed.reason)}</span></td>
+        <td style="max-width: 200px; white-space: normal; word-break: break-word; color: #d4d4d8; font-size: 0.85rem;">${escapeHtml(parsed.details || 'None')}</td>
+        <td style="color: var(--text-muted); font-size: 0.8rem;">${date}</td>
+        <td>
+          <div style="display: flex; gap: 6px;">
+            ${reviewBtnHtml}
+            ${strikeBtnHtml}
+            <button class="btn btn-danger" style="padding: 6px 12px; font-size: 0.75rem; background: #d92d20;" onclick="deleteReportedWallpaper('${parsed.id}', '${e.id}', '${fileUrl}', '${thumbUrl}')">🗑️ Delete</button>
+            <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.75rem;" onclick="dismissReport('${e.id}')">✓ Dismiss</button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+
+    container.innerHTML = `
+      <table class="strikes-table" style="width: 100%; border-collapse: collapse; text-align: left;">
+        <thead>
+          <tr>
+            <th>Wallpaper</th>
+            <th>Owner/Creator</th>
+            <th>Reporter</th>
+            <th>Reason</th>
+            <th>Details</th>
+            <th>Date</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows}
+        </tbody>
+      </table>
+    `;
+
+  } catch (err) {
+    console.error('Failed to fetch reports:', err);
+    container.innerHTML = `<div class="strikes-empty"><div class="empty-icon">❌</div><p>Failed to fetch reports: ${err.message}</p></div>`;
+  }
+}
+window.fetchReports = fetchReports;
+
+function resetSettingsToDefault() {
+  if (confirm('Are you sure you want to reset all settings to defaults? This will clear all custom database and R2 storage configurations.')) {
+    localStorage.removeItem('basic_wallpaper_admin_settings');
+    showToast('Settings reset to defaults. Reloading...', 'success');
+    setTimeout(() => {
+      location.reload();
+    }, 1000);
+  }
+}
+window.resetSettingsToDefault = resetSettingsToDefault;
+
+async function deleteReportedWallpaper(wpId, reportId, fileUrl = null, thumbnailUrl = null) {
+  if (!confirm('Are you sure you want to permanently delete this wallpaper from the library? This cannot be undone.')) return;
+  try {
+    showToast('Deleting wallpaper...', 'warning');
+
+    // 1. Delete DB record and associated files from storage
+    await executeWallpaperDeletion(wpId, fileUrl, thumbnailUrl);
+
+    // 2. Delete the report event from site_analytics so it clears
+    const { error: deleteReportErr } = await supabaseClient
+      .from('site_analytics')
+      .delete()
+      .eq('id', reportId);
+
+    if (deleteReportErr) throw deleteReportErr;
+
+    showToast('Wallpaper and files deleted successfully.', 'success');
+    fetchReports();
+  } catch (err) {
+    showToast(`Failed to delete wallpaper: ${err.message}`, 'error');
+  }
+}
+window.deleteReportedWallpaper = deleteReportedWallpaper;
+
+async function dismissReport(reportId) {
+  if (!confirm('Dismiss this report? This will remove the report flag.')) return;
+  try {
+    showToast('Dismissing report...', 'warning');
+
+    const { error } = await supabaseClient
+      .from('site_analytics')
+      .delete()
+      .eq('id', reportId);
+
+    if (error) throw error;
+
+    showToast('Report dismissed.', 'success');
+    fetchReports();
+  } catch (err) {
+    showToast(`Failed to dismiss: ${err.message}`, 'error');
+  }
+}
+window.dismissReport = dismissReport;
+
+async function fetchAppeals() {
+  const container = document.getElementById('appeals-table-container');
+  if (!supabaseClient) {
+    container.innerHTML = '<div class="strikes-empty"><div class="empty-icon">❌</div><p>Supabase client is not initialized. Please verify your connection settings in the Storage Settings tab.</p></div>';
+    return;
+  }
+  
+  container.innerHTML = '<div class="strikes-empty"><div class="empty-icon">⏳</div><p>Loading appeals...</p></div>';
+  console.log('Fetching appeals from appeals table using Supabase:', settings.supabaseUrl);
+
+  try {
+    const { data: appeals, error } = await supabaseClient
+      .from('appeals')
+      .select('*')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      if (error.code === '42P01' || error.message.includes('relation "appeals" does not exist')) {
+        container.innerHTML = '<div class="strikes-empty"><div class="empty-icon">ℹ️</div><p>Appeals table does not exist in your Supabase database. Please create it to start receiving recovery appeals.</p></div>';
+        return;
+      }
+      throw error;
+    }
+
+    if (!appeals || appeals.length === 0) {
+      container.innerHTML = '<div class="strikes-empty"><div class="empty-icon">✉️</div><p>No pending creator appeals.</p></div>';
+      
+      const badge = document.getElementById('pending-appeals-badge');
+      if (badge) badge.style.display = 'none';
+      return;
+    }
+
+    const badge = document.getElementById('pending-appeals-badge');
+    if (badge) {
+      badge.textContent = appeals.length;
+      badge.style.display = 'inline-block';
+    }
+
+    window.currentAppealsList = appeals;
+    const rows = appeals.map(a => {
+      const date = new Date(a.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      return `<tr>
+        <td><span style="font-weight: 600; color: #fff;">👤 ${escapeHtml(a.creator)}</span></td>
+        <td>
+          <a href="mailto:${escapeHtml(a.email)}?subject=Basic%20Wallpaper%20Appeal%20Response" style="font-family: monospace; font-size: 0.85rem; color: #3b82f6; text-decoration: underline;">
+            ✉️ ${escapeHtml(a.email || 'N/A')}
+          </a>
+        </td>
+        <td>
+          <span class="badge" style="background: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.2); text-transform: uppercase; font-size: 0.72rem; padding: 4px 8px; border-radius: 4px;">
+            ${escapeHtml(a.ban_type)}
+          </span>
+        </td>
+        <td style="max-width: 400px; white-space: normal; word-break: break-word; color: #d4d4d8; font-size: 0.85rem; line-height: 1.4;">${escapeHtml(a.appeal_text)}</td>
+        <td style="color: var(--text-muted); font-size: 0.8rem;">${date}</td>
+        <td>
+          <button class="btn btn-primary" style="padding: 6px 12px; font-size: 0.75rem; background: #3b82f6; border: none; color: #fff; font-weight: 600;" onclick="openAppealModal('${a.id}')">✉️ Respond</button>
+        </td>
+      </tr>`;
+    }).join('');
+
+    container.innerHTML = `
+      <table class="strikes-table" style="width: 100%; border-collapse: collapse; text-align: left;">
+        <thead>
+          <tr>
+            <th>Creator</th>
+            <th>Email</th>
+            <th>Ban Type</th>
+            <th>Reason / Appeal Text</th>
+            <th>Date Submitted</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows}
+        </tbody>
+      </table>
+    `;
+
+  } catch (err) {
+    console.error('Failed to fetch appeals:', err);
+    container.innerHTML = `<div class="strikes-empty"><div class="empty-icon">❌</div><p>Failed to fetch appeals: ${err.message}</p></div>`;
+  }
+}
+window.fetchAppeals = fetchAppeals;
+
+function openAppealModal(appealId) {
+  const appeal = window.currentAppealsList.find(a => a.id === appealId);
+  if (!appeal) return;
+
+  document.getElementById('appeal-modal-creator').textContent = appeal.creator;
+  document.getElementById('appeal-modal-bantype').textContent = appeal.ban_type;
+  document.getElementById('appeal-modal-email').textContent = appeal.email || 'N/A';
+  document.getElementById('appeal-modal-text').textContent = appeal.appeal_text;
+  
+  // Set up mailto link
+  const emailSubject = encodeURIComponent("Basic Wallpaper - Suspension Appeal Update");
+  const emailBody = encodeURIComponent(`Hello ${appeal.creator},\n\nWe have reviewed your appeal for suspension.\n\n[Moderator Response here]\n\nBest regards,\nBasic Wallpaper Moderation Team`);
+  document.getElementById('appeal-modal-mailto').href = `mailto:${appeal.email || ''}?subject=${emailSubject}&body=${emailBody}`;
+
+  // Default response notes
+  document.getElementById('appeal-response-notes').value = '';
+
+  // Wire up action buttons
+  const btnApprove = document.getElementById('btn-approve-appeal');
+  const btnReject = document.getElementById('btn-reject-appeal');
+
+  btnApprove.onclick = () => handleAppealModalAction(appeal, 'approved');
+  btnReject.onclick = () => handleAppealModalAction(appeal, 'rejected');
+
+  document.getElementById('appeal-modal').classList.add('active');
+}
+window.openAppealModal = openAppealModal;
+
+function closeAppealModal() {
+  document.getElementById('appeal-modal').classList.remove('active');
+}
+window.closeAppealModal = closeAppealModal;
+
+async function handleAppealModalAction(appeal, action) {
+  const notesInput = document.getElementById('appeal-response-notes').value.trim();
+  const notes = notesInput || (action === 'approved' 
+    ? 'Appeal approved. Your account has been recovered.' 
+    : 'Appeal rejected. The ban remains active.');
+
+  if (!confirm(`Are you sure you want to ${action === 'approved' ? 'approve and recover the account' : 'reject'} this appeal?`)) {
+    return;
+  }
+
+  try {
+    showToast(`${action === 'approved' ? 'Approving' : 'Rejecting'} appeal...`, 'warning');
+    
+    // 1. Update appeal status
+    const { error: appealError } = await supabaseClient
+      .from('appeals')
+      .update({ status: action })
+      .eq('id', appeal.id);
+      
+    if (appealError) throw appealError;
+    
+    // 2. Update strike notes and status
+    const strikeUpdates = { notes: notes };
+    if (action === 'approved') {
+      strikeUpdates.is_active = false;
+    }
+    
+    const { error: strikeError } = await supabaseClient
+      .from('strikes')
+      .update(strikeUpdates)
+      .eq('id', appeal.strike_id);
+        
+    if (strikeError) throw strikeError;
+
+    // 3. Compose email templates for confirmation
+    const emailSubject = encodeURIComponent(action === 'approved' ? 'Appeal Approved - Basic Wallpaper' : 'Appeal Rejected - Basic Wallpaper');
+    const emailBody = encodeURIComponent(`Hello ${appeal.creator},\n\nWe have reviewed your appeal.\n\nStatus: ${action.toUpperCase()}\nNotes: ${notes}\n\nBest regards,\nBasic Wallpaper Team`);
+    
+    showToast(`Appeal ${action}!`, "success");
+    
+    // Open email client with prefilled template automatically
+    if (appeal.email) {
+      window.open(`mailto:${appeal.email}?subject=${emailSubject}&body=${emailBody}`, '_blank');
+    }
+
+    closeAppealModal();
+    fetchAppeals();
+    updateAppealsBadge();
+  } catch (err) {
+    console.error("Error executing appeal action:", err);
+    showToast(`Failed to execute action: ${err.message}`, 'danger');
+  }
+}
+window.handleAppealModalAction = handleAppealModalAction;
+
+async function updateAppealsBadge() {
+  if (!supabaseClient) return;
+  try {
+    const { count, error } = await supabaseClient
+      .from('appeals')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending');
+    
+    const badge = document.getElementById('pending-appeals-badge');
+    if (!error && badge) {
+      if (count > 0) {
+        badge.textContent = count;
+        badge.style.display = 'inline-block';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+  } catch (e) {
+    console.warn("Could not query appeals count for badge:", e);
+  }
+}
+window.updateAppealsBadge = updateAppealsBadge;
+
+async function sendSystemNotification() {
+  const titleInput = document.getElementById('notif-title');
+  const messageInput = document.getElementById('notif-message');
+
+  const title = titleInput.value.trim();
+  const message = messageInput.value.trim();
+
+  if (!title || !message) {
+    showToast('Please fill out both notification title and message.', 'danger');
+    return;
+  }
+
+  if (!supabaseClient) {
+    showToast('Supabase client is not connected. Check your settings.', 'danger');
+    return;
+  }
+
+  try {
+    showToast('Broadcasting system notification...', 'warning');
+
+    const { data, error } = await supabaseClient
+      .from('system_notifications')
+      .insert([{ title, message }]);
+
+    if (error) throw error;
+
+    showToast('Notification broadcast sent successfully!', 'success');
+    titleInput.value = '';
+    messageInput.value = '';
+    fetchNotifications();
+  } catch (err) {
+    console.error('Failed to broadcast notification:', err);
+    showToast(`Failed to broadcast: ${err.message}`, 'danger');
+  }
+}
+window.sendSystemNotification = sendSystemNotification;
+
+async function revokeAllNotifications() {
+  const confirmRevoke = confirm('Are you sure you want to revoke (delete) all sent system notifications? This will remove them from all desktop app installations as well.');
+  if (!confirmRevoke) return;
+
+  if (!supabaseClient) {
+    showToast('Supabase client is not connected. Check your settings.', 'danger');
+    return;
+  }
+
+  try {
+    showToast('Revoking all notifications...', 'warning');
+
+    const { data, error } = await supabaseClient
+      .from('system_notifications')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+
+    if (error) throw error;
+
+    showToast('All system notifications revoked successfully!', 'success');
+    fetchNotifications();
+  } catch (err) {
+    console.error('Failed to revoke notifications:', err);
+    showToast(`Failed to revoke: ${err.message}`, 'danger');
+  }
+}
+window.revokeAllNotifications = revokeAllNotifications;
+
+async function fetchNotifications() {
+  const container = document.getElementById('notifications-list-container');
+  if (!container) return;
+
+  if (!supabaseClient) {
+    container.innerHTML = '<div style="color: #ef4444; font-size: 0.9rem;">Supabase client not connected.</div>';
+    return;
+  }
+
+  try {
+    container.innerHTML = '<div style="color: #a1a1aa; font-size: 0.9rem;">Loading active notifications...</div>';
+
+    const { data, error } = await supabaseClient
+      .from('system_notifications')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+      container.innerHTML = '<div style="color: #a1a1aa; font-size: 0.9rem; text-align: center; padding: 20px;">No active system notifications broadcasted.</div>';
+      return;
+    }
+
+    const rows = data.map(notif => {
+      const date = new Date(notif.created_at).toLocaleString();
+      return `
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+          <td style="padding: 12px 8px; color: #fff; font-weight: 600; font-size: 0.9rem;">${escapeHtml(notif.title)}</td>
+          <td style="padding: 12px 8px; color: #d4d4d8; font-size: 0.85rem; max-width: 300px; white-space: normal; word-break: break-word; line-height: 1.4;">${escapeHtml(notif.message)}</td>
+          <td style="padding: 12px 8px; color: #a1a1aa; font-size: 0.8rem; white-space: nowrap;">${date}</td>
+          <td style="padding: 12px 8px; text-align: right;">
+            <button class="btn" style="padding: 6px 12px; font-size: 0.75rem; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; font-weight: 600; cursor: pointer; border-radius: 4px; transition: all 0.2s;" 
+                    onclick="deleteNotification('${notif.id}')"
+                    onmouseover="this.style.background='rgba(239, 68, 68, 0.2)'"
+                    onmouseout="this.style.background='rgba(239, 68, 68, 0.1)'">
+              🗑️ Revoke
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    container.innerHTML = `
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+          <thead>
+            <tr style="border-bottom: 2px solid rgba(255,255,255,0.1); color: #a1a1aa; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;">
+              <th style="padding: 8px;">Title</th>
+              <th style="padding: 8px;">Message</th>
+              <th style="padding: 8px;">Created At</th>
+              <th style="padding: 8px; text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (err) {
+    console.error('Failed to fetch notifications:', err);
+    container.innerHTML = `<div style="color: #ef4444; font-size: 0.9rem;">Failed to load notifications: ${err.message}</div>`;
+  }
+}
+window.fetchNotifications = fetchNotifications;
+
+async function deleteNotification(id) {
+  const confirmDelete = confirm('Are you sure you want to revoke this specific system notification?');
+  if (!confirmDelete) return;
+
+  if (!supabaseClient) {
+    showToast('Supabase client is not connected.', 'danger');
+    return;
+  }
+
+  try {
+    showToast('Revoking notification...', 'warning');
+
+    const { error } = await supabaseClient
+      .from('system_notifications')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+
+    showToast('Notification revoked successfully!', 'success');
+    fetchNotifications();
+  } catch (err) {
+    console.error('Failed to revoke notification:', err);
+    showToast(`Failed to revoke: ${err.message}`, 'danger');
+  }
+}
+window.deleteNotification = deleteNotification;
+
+async function professionalizeNotification() {
+  const titleInput = document.getElementById('notif-title');
+  const messageInput = document.getElementById('notif-message');
+
+  const title = titleInput.value.trim();
+  const message = messageInput.value.trim();
+
+  if (!message) {
+    showToast('Please type a message in the Message Body first.', 'warning');
+    return;
+  }
+
+  const apiKey = settings.geminiApiKey;
+  if (!apiKey) {
+    showToast('Gemini API key is not configured. Go to Storage Settings to set it.', 'danger');
+    return;
+  }
+
+  try {
+    showToast('Professionalizing message with AI...', 'warning');
+
+    const promptText = `Rewrite the following notification title and message to sound highly professional, polite, concise, and clear for a desktop software application notification. Do not add any conversational remarks, markdown headers, or chatty prefix/suffix. Just output the rewritten result in JSON format with keys "title" and "message".
+
+Original Title: ${title || "System Update"}
+Original Message: ${message}`;
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: promptText
+          }]
+        }],
+        generationConfig: {
+          responseMimeType: "application/json"
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Gemini API error: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!responseText) {
+      throw new Error("No response content from Gemini API.");
+    }
+
+    const data = JSON.parse(responseText.trim());
+    if (data.title) {
+      titleInput.value = data.title;
+    }
+    if (data.message) {
+      messageInput.value = data.message;
+    }
+
+    showToast('Notification text professionalized successfully!', 'success');
+  } catch (err) {
+    console.error('Failed to professionalize text:', err);
+    showToast(`AI professionalizing failed: ${err.message}`, 'danger');
+  }
+}
+window.professionalizeNotification = professionalizeNotification;
+
+

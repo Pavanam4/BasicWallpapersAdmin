@@ -14,6 +14,11 @@
 
   <!-- Supabase JS Client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.8/dist/umd/supabase.js"></script>
+  <!-- Firebase compat SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
   <!-- AWS SDK (for Cloudflare R2 uploads) -->
   <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1363.0.min.js"></script>
 </head>
@@ -58,9 +63,22 @@
           Strikes &amp; Bans
           <span id="active-strikes-badge" style="display:none;background:#f04438;color:#fff;font-size:0.6rem;font-weight:700;padding:2px 6px;border-radius:10px;margin-left:auto;">0</span>
         </button>
+        <button class="nav-btn" id="btn-tab-reports" onclick="switchTab('reports')" style="position:relative">
+          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          User Reports
+        </button>
+        <button class="nav-btn" id="btn-tab-appeals" onclick="switchTab('appeals')" style="position:relative">
+          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Creator Appeals
+          <span id="pending-appeals-badge" style="display:none;background:#2e90fa;color:#fff;font-size:0.6rem;font-weight:700;padding:2px 6px;border-radius:10px;margin-left:auto;">0</span>
+        </button>
         <button class="nav-btn" id="btn-tab-settings" onclick="switchTab('settings')">
           <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           Storage Settings
+        </button>
+        <button class="nav-btn" id="btn-tab-notifications" onclick="switchTab('notifications')">
+          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          Send Notifications
         </button>
       </nav>
 
@@ -138,6 +156,14 @@
                   </select>
                 </div>
                 <div class="input-group">
+                  <label for="bulk-type">Format Type</label>
+                  <select id="bulk-type" style="background: rgba(255, 255, 255, 0.05); color: #fff; border: 1px solid var(--border-panel); border-radius: 6px; padding: 10px; font-family: inherit; font-size: 14px; outline: none; transition: border-color 0.2s; color-scheme: dark;">
+                    <option value="">-- No Change --</option>
+                    <option value="video">Live (Video)</option>
+                    <option value="image">4K Wallpaper (Picture)</option>
+                  </select>
+                </div>
+                <div class="input-group">
                   <label for="bulk-tags">Tags (comma-separated)</label>
                   <input type="text" id="bulk-tags" placeholder="e.g. 4k, dark, loop, anime">
                 </div>
@@ -161,7 +187,11 @@
               </div>
               <h3>Drag & Drop video or image files</h3>
               <p>Supports MP4, WebM, MKV, JPG, PNG, WEBP files (Max video size: 150MB)</p>
-              <button class="btn btn-primary" onclick="document.getElementById('file-input').click()">Browse Files</button>
+              <div style="display: flex; gap: 12px; justify-content: center; margin-top: 10px;">
+                <button class="btn btn-primary" onclick="document.getElementById('file-input').click()">Browse Files</button>
+                <button class="btn btn-secondary" onclick="document.getElementById('folder-input').click()">Upload Folder</button>
+              </div>
+              <input type="file" id="folder-input" webkitdirectory directory multiple class="file-input-hidden" style="display: none;">
             </div>
           </div>
 
@@ -293,8 +323,8 @@
                   <input type="text" id="supabase-url" placeholder="https://xxxx.supabase.co">
                 </div>
                 <div class="input-group">
-                  <label for="supabase-anon-key">Anon / API Key</label>
-                  <input type="password" id="supabase-anon-key" placeholder="Paste Supabase key">
+                  <label for="supabase-anon-key">Service Role / API Key</label>
+                  <input type="password" id="supabase-anon-key" placeholder="Paste Supabase service_role key">
                 </div>
                 <div class="input-row">
                   <div class="input-group">
@@ -309,11 +339,30 @@
               </div>
             </div>
 
+            <!-- Gemini AI Configuration -->
+            <div class="glass-panel settings-card">
+              <div class="card-header">
+                <span class="provider-logo">✨</span>
+                <div>
+                  <h3>Gemini AI Configuration</h3>
+                  <p>Configure Gemini API key for notification assistant features</p>
+                </div>
+              </div>
+              <div class="form-container">
+                <div class="input-group">
+                  <label for="gemini-api-key">Gemini API Key</label>
+                  <input type="password" id="gemini-api-key" placeholder="Paste Gemini API Key">
+                  <span class="input-hint">Used to professionalize notification text</span>
+                </div>
+              </div>
+            </div>
+
           </div>
 
           <!-- Save Row -->
           <div class="settings-actions">
             <button class="btn btn-secondary" onclick="testAllConnections()">Test API Connections</button>
+            <button class="btn btn-danger" onclick="resetSettingsToDefault()" style="background: #d92d20; border: none;">Reset to Defaults</button>
             <button class="btn btn-primary" onclick="saveSettings()">Save Storage Settings</button>
           </div>
 
@@ -366,7 +415,89 @@
               </div>
             </div>
           </div>
+ 
+        </section>
 
+        <!-- 5. USER REPORTS TAB -->
+        <section class="tab-content" id="tab-reports">
+          <div class="strikes-table-panel" style="margin-top: 0;">
+            <div class="strikes-table-header">
+              <h3>⚠️ Active Reports on Wallpapers</h3>
+              <button class="btn btn-secondary" style="font-size:0.8rem;padding:8px 16px;" onclick="fetchReports()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                Refresh
+              </button>
+            </div>
+            <div id="reports-table-container">
+              <div class="strikes-empty">
+                <div class="empty-icon">🛡️</div>
+                <p>No reports found.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 6. CREATOR APPEALS TAB -->
+        <section class="tab-content" id="tab-appeals">
+          <div class="strikes-table-panel" style="margin-top: 0;">
+            <div class="strikes-table-header">
+              <h3>✉️ Pending Creator Appeals</h3>
+              <button class="btn btn-secondary" style="font-size:0.8rem;padding:8px 16px;" onclick="fetchAppeals()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                Refresh
+              </button>
+            </div>
+            <div id="appeals-table-container">
+              <div class="strikes-empty">
+                <div class="empty-icon">🛡️</div>
+                <p>No appeals found.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 7. NOTIFICATIONS TAB -->
+        <section class="tab-content" id="tab-notifications">
+          <div style="display: flex; flex-direction: column; gap: 32px; max-width: 800px; margin: 0 auto;">
+            <div class="glass-panel settings-card" style="padding: 32px;">
+              <div class="card-header" style="display: flex; gap: 16px; align-items: center; margin-bottom: 24px;">
+                <span class="provider-logo" style="font-size: 2.5rem; line-height: 1;">📢</span>
+                <div>
+                  <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.4rem; font-weight: 700; margin: 0; color: #fff;">Broadcast System Notification</h3>
+                  <p style="font-size: 0.85rem; color: #a1a1aa; margin: 4px 0 0 0; line-height: 1.4;">Send real-time alerts or system news to all Basic Wallpaper desktop app users.</p>
+                </div>
+              </div>
+              <div class="form-container" style="display: flex; flex-direction: column; gap: 20px;">
+                <div class="input-group">
+                  <label for="notif-title" style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 0.85rem; color: #e4e4e7;">Notification Title</label>
+                  <input type="text" id="notif-title" placeholder="e.g. Server Maintenance or New Version Available!" style="width: 100%; padding: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; outline: none; box-sizing: border-box; font-family: inherit;">
+                </div>
+                <div class="input-group">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <label for="notif-message" style="margin: 0; font-weight: 600; font-size: 0.85rem; color: #e4e4e7;">Message Body</label>
+                    <button class="btn" onclick="professionalizeNotification()" style="padding: 4px 8px; font-size: 0.75rem; background: rgba(127, 86, 217, 0.2); border: 1px solid rgba(127, 86, 217, 0.4); color: #a482f4; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-weight: 600; transition: all 0.2s;" onmouseover="this.style.background='rgba(127, 86, 217, 0.3)'" onmouseout="this.style.background='rgba(127, 86, 217, 0.2)'">
+                      ✨ Professionalize with AI
+                    </button>
+                  </div>
+                  <textarea id="notif-message" rows="5" placeholder="Enter notification message here..." style="width: 100%; padding: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; outline: none; box-sizing: border-box; resize: vertical; font-family: inherit; font-size: 0.9rem; line-height: 1.5;"></textarea>
+                </div>
+                <button class="btn btn-primary" onclick="sendSystemNotification()" style="font-weight: 700; padding: 14px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(135deg, #7F56D9, #98A2B3); border: none; color: #fff; font-size: 0.95rem; margin-top: 10px; transition: opacity 0.2s;">
+                  🚀 Broadcast Notification
+                </button>
+                <button class="btn" onclick="revokeAllNotifications()" style="font-weight: 700; padding: 14px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; font-size: 0.95rem; margin-top: 10px; transition: all 0.2s;" onmouseover="this.style.background='rgba(239, 68, 68, 0.2)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.1)'">
+                  🗑️ Revoke All Notifications
+                </button>
+              </div>
+            </div>
+
+            <div class="glass-panel settings-card" style="padding: 32px;">
+              <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.4rem; font-weight: 700; margin: 0 0 8px 0; color: #fff;">Active Notifications</h3>
+              <p style="font-size: 0.85rem; color: #a1a1aa; margin: 0 0 20px 0; line-height: 1.4;">Below is a list of currently broadcasted notifications. You can revoke them individually.</p>
+              <div id="notifications-list-container">
+                <!-- Loaded dynamically -->
+              </div>
+            </div>
+          </div>
         </section>
 
       </div>
@@ -421,19 +552,42 @@
           </div>
         </div>
 
-        <!-- Duration row (low/medium only) -->
-        <div class="duration-row" id="duration-row">
+        <!-- Block Duration Selector -->
+        <div class="input-group" id="duration-selection-group">
+          <label for="strike-duration-preset">Block Duration</label>
+          <select id="strike-duration-preset" class="form-input" style="color-scheme: dark; background: rgba(255,255,255,0.05); border: 1px solid var(--border-panel); color: #fff; padding: 10px; border-radius: 8px; width: 100%; outline: none;" onchange="onPresetDurationChange()">
+            <option value="warning">💬 No Block (Warning Only)</option>
+            <option value="2_days" selected>⏱️ 2 Days</option>
+            <option value="5_days">⏱️ 5 Days</option>
+            <option value="1_month">🔒 1 Month (30 Days)</option>
+            <option value="6_months">🔒 6 Months (180 Days)</option>
+            <option value="1_year">🚫 1 Year (365 Days)</option>
+            <option value="permanent">☠️ Permanent Ban (Forever)</option>
+            <option value="custom">⚙️ Custom Duration...</option>
+          </select>
+        </div>
+
+        <!-- Custom Duration Inputs (shown only when Custom is chosen) -->
+        <div class="duration-row" id="duration-custom-row" style="display: none; gap: 12px; margin-top: 10px; width: 100%;">
           <div class="input-group" style="flex:1">
-            <label for="strike-duration-value">Block Duration</label>
-            <input type="number" id="strike-duration-value" min="1" max="365" value="3" placeholder="e.g. 7">
+            <label for="strike-duration-value">Custom Value</label>
+            <input type="number" id="strike-duration-value" min="1" max="365" value="3" placeholder="e.g. 7" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-panel); color: #fff; padding: 10px; border-radius: 8px; width: 100%;">
           </div>
           <div class="input-group" style="flex:1">
             <label for="strike-duration-unit">Unit</label>
-            <select id="strike-duration-unit">
+            <select id="strike-duration-unit" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-panel); color: #fff; padding: 10px; border-radius: 8px; width: 100%; color-scheme: dark;">
               <option value="hours">Hours</option>
               <option value="days" selected>Days</option>
+              <option value="weeks">Weeks</option>
+              <option value="months">Months</option>
             </select>
           </div>
+        </div>
+
+        <!-- Delete Wallpaper Checkbox -->
+        <div class="input-group" style="display: flex; flex-direction: row; align-items: center; gap: 10px; margin-top: 8px;">
+          <input type="checkbox" id="strike-delete-wallpaper" checked style="width: 16px; height: 16px; cursor: pointer; accent-color: #f04438;">
+          <label for="strike-delete-wallpaper" style="margin-bottom: 0; cursor: pointer; text-transform: none; font-size: 0.85rem; color: #fff; font-weight: 500;">🗑️ Also delete this wallpaper from community library</label>
         </div>
 
         <!-- Reason -->
@@ -521,6 +675,62 @@
     <div class="gallery-context-menu-item" onclick="selectCtxCategory('Super Heroes')">Super Heroes</div>
     <div class="dropdown-divider" id="gallery-context-divider" style="height: 1px; background: rgba(255,255,255,0.08); margin: 6px 0;"></div>
     <div class="gallery-context-menu-item" id="gallery-context-change-thumb" onclick="openThumbnailModalOption()" style="color: var(--accent, #00c2ff); font-weight: 600;">📸 Change Thumbnail</div>
+  </div>
+
+  <!-- Creator Appeal Response Modal -->
+  <div class="modal" id="appeal-modal" onclick="closeAppealModal()">
+    <div class="modal-content" onclick="event.stopPropagation()" style="max-width: 600px; padding: 28px; text-align: left; background: #0c0c14; border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.7);">
+      <button class="modal-close" onclick="closeAppealModal()">&times;</button>
+      <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.4rem; font-weight: 700; margin: 0 0 6px 0; color: #fff;">✉️ Respond to Creator Appeal</h3>
+      <p style="font-size: 0.85rem; color: #a1a1aa; margin: 0 0 20px 0; font-family: 'Inter', sans-serif; line-height: 1.5;">Review the appeal details below. You can directly contact the user or write a response/moderator note, then approve or reject the appeal.</p>
+      
+      <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 18px; margin-bottom: 20px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px;">
+          <div>
+            <label style="font-size: 0.75rem; color: var(--text-muted, #71717a); font-weight: 600; text-transform: uppercase;">Creator Name</label>
+            <div id="appeal-modal-creator" style="color: #fff; font-weight: 600; margin-top: 4px; font-size: 0.95rem;">Creator Name</div>
+          </div>
+          <div>
+            <label style="font-size: 0.75rem; color: var(--text-muted, #71717a); font-weight: 600; text-transform: uppercase;">Ban Type</label>
+            <div style="margin-top: 4px;">
+              <span id="appeal-modal-bantype" class="badge" style="background: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.2); font-size: 0.72rem; padding: 4px 8px; border-radius: 4px; text-transform: uppercase;">TEMPORARY</span>
+            </div>
+          </div>
+        </div>
+        
+        <div style="margin-bottom: 12px;">
+          <label style="font-size: 0.75rem; color: var(--text-muted, #71717a); font-weight: 600; text-transform: uppercase;">Email Address</label>
+          <div style="margin-top: 4px; display: flex; align-items: center; gap: 10px;">
+            <span id="appeal-modal-email" style="font-family: monospace; color: #a1a1aa; font-size: 0.9rem;">email@address.com</span>
+            <a id="appeal-modal-mailto" href="#" class="btn" style="padding: 4px 8px; font-size: 0.75rem; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); color: #60a5fa; text-decoration: none; border-radius: 4px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+              ✉️ Contact via Email
+            </a>
+          </div>
+        </div>
+        
+        <div style="margin-bottom: 4px;">
+          <label style="font-size: 0.75rem; color: var(--text-muted, #71717a); font-weight: 600; text-transform: uppercase;">Appeal Message</label>
+          <div id="appeal-modal-text" style="color: #e4e4e7; font-size: 0.88rem; line-height: 1.5; margin-top: 6px; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.03); max-height: 120px; overflow-y: auto;">
+            This is the appeal text...
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 24px;">
+        <label style="font-size: 0.8rem; color: #fff; font-weight: 600; display: block; margin-bottom: 8px;">Moderator Notes / Response (Displayed to Creator)</label>
+        <textarea id="appeal-response-notes" rows="4" style="width: 100%; padding: 12px; background: #141424; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; font-family: inherit; font-size: 0.88rem; resize: vertical; box-sizing: border-box;" placeholder="Enter reply details here. The creator will see this in their app under Moderator Notes..."></textarea>
+      </div>
+
+      <div style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button class="btn" onclick="closeAppealModal()" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #fff; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 0.85rem; font-weight: 600;">Cancel</button>
+        <button class="btn" id="btn-reject-appeal" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; font-weight: 600; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 0.85rem;">
+          ✕ Reject Appeal
+        </button>
+        <button class="btn" id="btn-approve-appeal" style="background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.3); color: #4ade80; font-weight: 600; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 0.85rem;">
+          ✓ Approve (Unban)
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- Toast Notification System -->
