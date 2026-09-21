@@ -3038,18 +3038,48 @@ async function handleAppealModalAction(appeal, action) {
       
     if (appealError) throw appealError;
     
-    // 2. Update strike notes and status
+    // 2. Update strike notes and status if strike_id is a valid UUID
     const strikeUpdates = { notes: notes };
     if (action === 'approved') {
       strikeUpdates.is_active = false;
     }
     
-    const { error: strikeError } = await supabaseClient
-      .from('strikes')
-      .update(strikeUpdates)
-      .eq('id', appeal.strike_id);
-        
-    if (strikeError) throw strikeError;
+    const isValidUUID = (val) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
+    if (isValidUUID(appeal.strike_id)) {
+      try {
+        const { data: struckData, error: strikeError } = await supabaseClient
+          .from('strikes')
+          .update(strikeUpdates)
+          .eq('id', appeal.strike_id)
+          .select();
+          
+        if (strikeError) console.warn('[Strike update by ID error]:', strikeError.message);
+
+        // Unstrike associated wallpaper if approved
+        if (action === 'approved' && struckData && struckData[0] && struckData[0].wallpaper_id) {
+          await supabaseClient
+            .from('community_wallpapers')
+            .update({ is_struck: false, strike_reason: null })
+            .eq('id', struckData[0].wallpaper_id);
+        }
+      } catch (stErr) {
+        console.warn('Strike update exception:', stErr);
+      }
+    }
+
+    // Always lift active strikes for this creator when appeal is approved
+    if (action === 'approved' && appeal.creator) {
+      try {
+        await supabaseClient
+          .from('strikes')
+          .update({ is_active: false, notes: notes })
+          .eq('creator', appeal.creator)
+          .eq('is_active', true);
+      } catch (crErr) {
+        console.warn('Creator strikes lift error:', crErr);
+      }
+    }
 
     // 3. Compose email templates for confirmation
     const emailSubject = encodeURIComponent(action === 'approved' ? 'Appeal Approved - Basic Wallpaper' : 'Appeal Rejected - Basic Wallpaper');
@@ -3064,7 +3094,9 @@ async function handleAppealModalAction(appeal, action) {
 
     closeAppealModal();
     fetchAppeals();
+    fetchStrikes();
     updateAppealsBadge();
+    updateStrikesBadge();
   } catch (err) {
     console.error("Error executing appeal action:", err);
     showToast(`Failed to execute action: ${err.message}`, 'danger');
