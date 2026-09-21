@@ -1,0 +1,787 @@
+/* ============================================================
+   HERO BANNER REDESIGN — Professional Sliding Banner
+   ============================================================ */
+
+/* ---- HERO SECTION OVERRIDE ---- */
+.hero {
+  position: relative;
+  height: 100vh;
+  min-height: 620px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: transparent;
+  padding-top: 72px; /* navbar height */
+  box-sizing: border-box;
+}
+body.cli-bar-visible .hero {
+  height: calc(100vh - 46px);
+}
+
+/* ---- SLIDING BANNER WRAPPER ---- */
+.hero-slider {
+  position: relative;
+  width: 100%;
+  flex: 1;
+  min-height: 400px;
+  overflow: hidden;
+}
+
+/* ---- SLIDES ---- */
+.slide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: stretch;
+  opacity: 0;
+  transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateX(60px);
+  pointer-events: none;
+}
+.slide.active {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: all;
+  z-index: 2;
+}
+.slide.exit {
+  opacity: 0;
+  transform: translateX(-60px);
+  z-index: 1;
+}
+
+/* ---- SLIDE BACKGROUND VIDEO ---- */
+.slide-video-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+.slide-video-bg video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: brightness(0.28) saturate(1.2);
+}
+/* Gradient Overlay */
+.slide-video-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.55) 50%, rgba(0,0,0,0.15) 100%),
+    linear-gradient(180deg, rgba(0,0,0,0.4) 0%, transparent 40%, transparent 60%, rgba(0,0,0,0.7) 100%);
+}
+
+/* ---- SLIDE CONTENT ---- */
+.slide-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+  width: 100%;
+  position: relative;
+  z-index: 2;
+  gap: 40px;
+}
+
+.slide-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-width: 600px;
+  gap: 0;
+  padding: 0;
+}
+
+.slide-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.45);
+  margin-bottom: 14px;
+}
+
+.slide-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: clamp(2.6rem, 5vw, 4.2rem);
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -1.5px;
+  color: #ffffff;
+  margin-bottom: 18px;
+  text-shadow: 0 4px 24px rgba(0,0,0,0.6);
+}
+.slide-title .accent-word {
+  background: linear-gradient(135deg, #00c2ff, #c084fc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.slide-desc {
+  font-size: 1.05rem;
+  color: rgba(255,255,255,0.7);
+  line-height: 1.7;
+  margin-bottom: 32px;
+  max-width: 520px;
+}
+
+.slide-actions {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.slide-badge {
+  display: none; /* removed — was too AI-generated looking */
+}
+
+/* ---- SLIDE RIGHT PANEL (Wallpaper Preview) ---- */
+.slide-preview-panel {
+  position: relative;
+  width: 48%;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.slide-preview-frame {
+  width: 100%;
+  max-width: 580px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 32px 80px rgba(0,0,0,0.7), 0 0 60px rgba(0,194,255,0.08);
+  background: #000;
+  aspect-ratio: 16/9;
+  position: relative;
+}
+.slide-preview-frame video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.slide-preview-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(0,0,0,0.15) 0%, transparent 100%);
+  pointer-events: none;
+}
+.slide-preview-tag {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.8);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.slide-preview-tag svg {
+  width: 10px;
+  height: 10px;
+  color: #4ade80;
+}
+
+/* ---- SLIDER CONTROLS ---- */
+.slider-controls {
+  position: absolute;
+  bottom: 24px;
+  left: 60px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.slider-dots {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.slider-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.3);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+  padding: 0;
+}
+.slider-dot.active {
+  width: 28px;
+  border-radius: 3px;
+  background: #ffffff;
+}
+.slider-dot:hover {
+  background: rgba(255,255,255,0.6);
+}
+
+.slider-arrow {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: white;
+  backdrop-filter: blur(10px);
+}
+.slider-arrow:hover {
+  background: rgba(255,255,255,0.15);
+  border-color: rgba(255,255,255,0.25);
+  transform: scale(1.05);
+}
+.slider-arrow svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ---- SLIDER PROGRESS BAR ---- */
+.slider-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgba(255,255,255,0.08);
+  z-index: 10;
+}
+.slider-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #00c2ff, #c084fc);
+  width: 0%;
+  transition: width linear;
+}
+
+/* ---- SLIDE COUNTER ---- */
+.slider-counter {
+  position: absolute;
+  bottom: 28px;
+  right: 40px;
+  z-index: 10;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.4);
+  letter-spacing: 2px;
+}
+.slider-counter span {
+  color: rgba(255,255,255,0.9);
+}
+
+/* ---- STATS BAR (below slider) ---- */
+.hero-stats-bar {
+  background: rgba(255,255,255,0.03);
+  border-top: 1px solid rgba(255,255,255,0.07);
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  width: 100%;
+  flex-shrink: 0;
+}
+.stats-bar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 0;
+  width: 100%;
+}
+.stats-bar-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 40px;
+  flex: 1;
+  justify-content: center;
+  border-right: 1px solid rgba(255,255,255,0.07);
+  transition: background 0.2s ease;
+}
+.stats-bar-item:last-child {
+  border-right: none;
+}
+.stats-bar-item:hover {
+  background: rgba(255,255,255,0.03);
+}
+.stats-bar-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.stats-bar-icon svg {
+  width: 18px;
+  height: 18px;
+}
+.stats-bar-icon.blue { background: rgba(0,194,255,0.1); color: #00c2ff; }
+.stats-bar-icon.purple { background: rgba(192,132,252,0.1); color: #c084fc; }
+.stats-bar-icon.green { background: rgba(74,222,128,0.1); color: #4ade80; }
+.stats-bar-icon.orange { background: rgba(251,146,60,0.1); color: #fb923c; }
+
+.stats-bar-text {
+  display: flex;
+  flex-direction: column;
+}
+.stats-bar-value {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+}
+.stats-bar-label {
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.45);
+  margin-top: 3px;
+  font-weight: 500;
+}
+
+/* ---- SECTION SPACING OVERRIDES — no empty space ---- */
+#features {
+  padding: 80px 0 80px;
+}
+#features::before { display: none; } /* remove old pseudo */
+
+#showcase {
+  padding: 80px 0;
+  background: transparent !important;
+}
+
+#explore {
+  padding: 80px 0 !important;
+  background: transparent !important;
+}
+
+#how-it-works {
+  padding: 80px 0;
+}
+
+#tutorials {
+  padding: 80px 0 !important;
+  background: transparent !important;
+}
+
+#blog {
+  padding: 80px 0;
+  background: transparent !important;
+}
+
+#cta {
+  padding: 80px 0;
+}
+
+/* ---- SECTION SEPARATOR (replaces empty space) ---- */
+.section-divider {
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
+  margin: 0;
+}
+
+/* ---- FEATURES GRID DENSITY ---- */
+.section-header {
+  margin-bottom: 44px;
+}
+
+/* ---- GALLERY GRID MORE DENSE ---- */
+.gallery-grid {
+  margin-top: 36px !important;
+  gap: 20px !important;
+}
+
+/* ---- TIGHT BLOG GRID ---- */
+.blog-grid {
+  margin-top: 44px;
+}
+
+/* ---- CTA BOX TIGHTER ---- */
+.cta-box {
+  padding: 60px 60px;
+}
+
+/* ---- FOOTER TIGHTER ---- */
+footer {
+  padding: 48px 0 28px;
+}
+
+/* ---- HERO CONTAINER OVERRIDE ---- */
+#hero > .container {
+  display: none !important; /* Hide old hero container */
+}
+
+/* ---- RESPONSIVE ---- */
+@media (max-width: 1024px) {
+  .slide-preview-panel {
+    display: none;
+  }
+  .slide-content {
+    max-width: 100%;
+    padding: 40px;
+  }
+  .slider-controls {
+    left: 40px;
+  }
+}
+
+@media (max-width: 768px) {
+  .hero {
+    padding-top: 64px;
+  }
+  .hero-slider {
+    height: calc(100svh - 64px);
+    min-height: 500px;
+  }
+  .slide-content {
+    padding: 28px 24px;
+  }
+  .slide-title {
+    font-size: clamp(2rem, 7vw, 3rem);
+  }
+  .slide-desc {
+    font-size: 0.95rem;
+  }
+  .stats-bar-item {
+    padding: 14px 18px;
+    gap: 10px;
+  }
+  .stats-bar-value {
+    font-size: 1.1rem;
+  }
+  .slider-controls {
+    left: 24px;
+    bottom: 24px;
+  }
+  .slider-counter {
+    right: 24px;
+    bottom: 32px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-stats-bar {
+    flex-wrap: wrap;
+  }
+  .stats-bar-item {
+    flex: 1 1 45%;
+    border-right: none;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+  }
+}
+
+/* ---- STICKY CLI BAR (pinned bottom) ---- */
+.pinned-cli-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 9, 15, 0.94);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255,255,255,0.07);
+  padding: 10px 24px;
+  gap: 16px;
+}
+.pinned-cli-label {
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.3);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.pinned-cli-code {
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 0.78rem;
+  color: #4ade80;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 540px;
+}
+.pinned-cli-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.65);
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.pinned-cli-copy:hover {
+  background: rgba(255,255,255,0.11);
+  border-color: rgba(255,255,255,0.18);
+  color: #fff;
+}
+.pinned-cli-copy svg {
+  width: 11px;
+  height: 11px;
+}
+.pinned-cli-dismiss {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.18);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+  transition: color 0.2s;
+  flex-shrink: 0;
+}
+.pinned-cli-dismiss:hover {
+  color: rgba(255,255,255,0.45);
+}
+
+/* Nudge footer etc. up so bar doesn't cover content */
+body.cli-bar-visible {
+  padding-bottom: 46px;
+}
+
+@media (max-width: 640px) {
+  .pinned-cli-bar {
+    padding: 10px 16px;
+    gap: 10px;
+  }
+  .pinned-cli-code {
+    max-width: none;
+    flex: 1;
+    font-size: 0.78rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .pinned-cli-code::-webkit-scrollbar {
+    display: none;
+  }
+  .pinned-cli-label {
+    display: none;
+  }
+}
+
+/* ============================================================
+   HERO BANNER — MOBILE RESPONSIVE OVERHAUL
+   ============================================================ */
+
+/* ---- TABLET (1024px) ---- */
+@media (max-width: 1024px) {
+  /* Hide preview panel — content goes full width */
+  .slide-preview-panel { display: none !important; }
+  .slide-content {
+    max-width: 100%;
+    padding: 40px 40px 80px;
+  }
+  .slider-controls { left: 40px; }
+  .slider-counter { right: 40px; }
+
+  /* Section paddings */
+  #features { padding: 72px 0 72px; }
+  #showcase { padding: 72px 0; }
+  #how-it-works { padding: 72px 0; }
+  #tutorials { padding: 72px 0 !important; }
+  #blog { padding: 72px 0; }
+  #cta { padding: 72px 0; }
+  .cta-box { padding: 60px 40px; }
+  footer { padding: 44px 0 24px; }
+}
+
+/* ---- PHONE (768px) ---- */
+@media (max-width: 768px) {
+  /* --- Hero --- */
+  .hero {
+    padding-top: 60px;
+    height: auto;
+    min-height: 100svh;
+  }
+  body.cli-bar-visible .hero {
+    height: auto;
+    min-height: calc(100svh - 46px);
+  }
+
+  .hero-slider {
+    min-height: 480px;
+    height: calc(100svh - 60px);
+  }
+
+  /* Slide — stack layout on mobile */
+  .slide {
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  /* Content area: sit at bottom, full width */
+  .slide-content {
+    max-width: 100%;
+    width: 100%;
+    padding: 24px 20px 110px;
+    background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%);
+    justify-content: flex-end;
+    min-height: 60%;
+    align-items: center;
+    text-align: center;
+  }
+
+  /* Overlay gradient — stronger on mobile for readability */
+  .slide-video-bg::after {
+    background:
+      linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.3) 40%, rgba(0,0,0,0.85) 100%);
+  }
+
+  /* Title — smaller and tight */
+  .slide-title {
+    font-size: clamp(1.8rem, 7.5vw, 2.6rem);
+    letter-spacing: -0.5px;
+    margin-bottom: 10px;
+  }
+
+  /* Description — hide on tiny phones to save space, show at 480+ */
+  .slide-desc {
+    font-size: 0.9rem;
+    margin-bottom: 20px;
+    max-width: 100%;
+    -webkit-line-clamp: 3;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Actions — stack on mobile */
+  .slide-actions {
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    align-items: center;
+  }
+  .slide-actions .btn-primary,
+  .slide-actions .btn-secondary {
+    width: 100%;
+    max-width: 280px;
+    justify-content: center;
+    padding: 12px 20px;
+    font-size: 0.95rem;
+  }
+
+  /* Eyebrow label — keep but smaller */
+  .slide-eyebrow { font-size: 0.62rem; letter-spacing: 2px; margin-bottom: 10px; }
+
+  /* Slider controls — centered, larger tap targets */
+  .slider-controls {
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 20px;
+    gap: 16px;
+  }
+
+  .slider-arrow {
+    width: 44px;
+    height: 44px;
+  }
+  .slider-arrow svg { width: 18px; height: 18px; }
+
+  .slider-counter {
+    right: 20px;
+    bottom: 28px;
+    font-size: 0.7rem;
+  }
+
+  /* Dots */
+  .slider-dot { width: 5px; height: 5px; }
+  .slider-dot.active { width: 22px; }
+
+  /* Stats bar — 2×2 grid on mobile */
+  .hero-stats-bar {
+    flex-wrap: wrap;
+    border-top: 1px solid rgba(255,255,255,0.07);
+  }
+  .stats-bar-item {
+    flex: 1 1 50%;
+    min-width: 0;
+    padding: 14px 12px;
+    gap: 10px;
+    border-right: 1px solid rgba(255,255,255,0.07);
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    box-sizing: border-box;
+  }
+  /* Remove right border on every 2nd item */
+  .stats-bar-item:nth-child(2n) { border-right: none; }
+  /* Remove bottom border on last two items */
+  .stats-bar-item:nth-last-child(-n+2) { border-bottom: none; }
+  .stats-bar-item:last-child { border-right: none; }
+
+  .stats-bar-icon { width: 32px; height: 32px; border-radius: 8px; }
+  .stats-bar-icon svg { width: 14px; height: 14px; }
+  .stats-bar-value { font-size: 1rem; }
+  .stats-bar-label { font-size: 0.7rem; }
+
+  /* Section spacing */
+  #features { padding: 56px 0 56px; }
+  #showcase { padding: 56px 0; }
+  #how-it-works { padding: 56px 0; }
+  #tutorials { padding: 56px 0 !important; }
+  #blog { padding: 56px 0; }
+  #cta { padding: 56px 0; }
+  .section-header { margin-bottom: 32px; }
+  .cta-box { padding: 40px 20px; }
+  footer { padding: 40px 0 16px; }
+}
+
+/* ---- VERY SMALL PHONE (480px) ---- */
+@media (max-width: 480px) {
+  .hero-slider { min-height: 440px; }
+  .slide-title { font-size: clamp(1.6rem, 8vw, 2.2rem); }
+  .slide-desc { display: none; } /* hide desc on tiny screens for cleaner look */
+  .slide-content { padding: 20px 16px 90px; }
+
+  /* Pinned CLI bar — ultra compact */
+  .pinned-cli-bar { padding: 8px 12px; gap: 8px; }
+  .pinned-cli-code { font-size: 0.75rem; max-width: none; }
+  .pinned-cli-copy { padding: 5px 10px; font-size: 0.68rem; }
+  .pinned-cli-dismiss { font-size: 0.95rem; }
+}
+
+/* ---- VERY SMALL (360px) ---- */
+@media (max-width: 360px) {
+  .slide-title { font-size: 1.5rem; }
+  .slide-actions .btn-primary,
+  .slide-actions .btn-secondary { font-size: 0.875rem; padding: 10px 16px; max-width: 240px; }
+  .stats-bar-value { font-size: 0.95rem; }
+  .stats-bar-label { font-size: 0.65rem; }
+}

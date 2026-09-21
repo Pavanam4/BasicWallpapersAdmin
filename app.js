@@ -202,6 +202,7 @@ class FirestoreQueryBuilder {
 // App Constants & State
 let activeTab = 'upload';
 let uploadDestination = 'r2'; // 'supabase' or 'r2'
+let cursorUploadDestination = 'r2'; // cursor upload destination
 let uploadQueue = [];
 let isUploading = false;
 let communityWallpapers = [];
@@ -211,8 +212,8 @@ const WORKER_URL = 'https://solitary-sound-f6ff.pavanam926.workers.dev';
 
 // Default credentials based on WPF app configuration
 const DEFAULT_SETTINGS = {
-  supabaseUrl: 'https://msgncyczxaldboqqyjhw.supabase.co',
-  supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1zZ25jeWN6eGFsZGJvcXF5amh3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NDI2ODksImV4cCI6MjA5MzMxODY4OX0.xccy6mitXQJ5eckmcOTxRn6O5iy1Mlbd-wY5lxOzPHI',
+  supabaseUrl: 'https://bvwvimqzlzknupxbnqco.supabase.co',
+  supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ2d3ZpbXF6bHprbnVweGJucWNvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjE4MDM4OSwiZXhwIjoyMTAxNzU2Mzg5fQ._VjRoRycgZijQgKkD17y1avi9wZirjI0zcTxC2nIhWc',
   supabaseWallpapersBucket: 'wallpapers',
   supabaseThumbnailsBucket: 'thumbnails',
   r2AccountId: '4ebc2f5c259cf67d98468f749a56176c',
@@ -240,31 +241,33 @@ document.addEventListener('DOMContentLoaded', () => {
   switchTab('upload');
 });
 
+function isServiceRoleKey(key) {
+  try {
+    if (!key || typeof key !== 'string') return false;
+    const parts = key.split('.');
+    if (parts.length < 2) return false;
+    const payload = JSON.parse(atob(parts[1]));
+    return payload && payload.role === 'service_role';
+  } catch (e) {
+    return false;
+  }
+}
+
 // Load Settings from LocalStorage
 function loadSettings() {
-  // Clear localStorage once if access keys are empty or if they contain the old defaults
-  try {
-    const raw = localStorage.getItem('basic_wallpaper_admin_settings');
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (!parsed.r2AccessKey || !parsed.r2SecretKey || parsed.r2Bucket === 'wallpaper-videos-new') {
-        localStorage.removeItem('basic_wallpaper_admin_settings');
-      }
-    }
-  } catch (e) {}
-
   const saved = localStorage.getItem('basic_wallpaper_admin_settings');
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
       settings = { ...DEFAULT_SETTINGS, ...parsed };
       
-      // Fallback empty localStorage values to newly set defaults
-      if (!settings.r2AccountId) settings.r2AccountId = DEFAULT_SETTINGS.r2AccountId;
-      if (!settings.r2AccessKey) settings.r2AccessKey = DEFAULT_SETTINGS.r2AccessKey;
-      if (!settings.r2SecretKey) settings.r2SecretKey = DEFAULT_SETTINGS.r2SecretKey;
-      if (!settings.r2Bucket || settings.r2Bucket === 'wallpaper-videos-new') settings.r2Bucket = DEFAULT_SETTINGS.r2Bucket;
-      if (!settings.r2CustomDomain || settings.r2CustomDomain.includes('pub-ea558d73cf444cc9d18b6fd1948cf828') || settings.r2CustomDomain.includes('pub-ea550d73efa44ce9a10a6fa1948cf626')) settings.r2CustomDomain = DEFAULT_SETTINGS.r2CustomDomain;
+      // Auto-migrate if legacy Supabase project URL was cached or not a service_role key
+      if (!settings.supabaseUrl || settings.supabaseUrl.includes('msgncyczxaldboqqyjhw') || !isServiceRoleKey(settings.supabaseKey)) {
+        console.log('[AdminPanel] Auto-migrating credentials to active Supabase service_role key');
+        settings.supabaseUrl = DEFAULT_SETTINGS.supabaseUrl;
+        settings.supabaseKey = DEFAULT_SETTINGS.supabaseKey;
+        localStorage.setItem('basic_wallpaper_admin_settings', JSON.stringify(settings));
+      }
     } catch (e) {
       console.error('Failed to parse settings, using defaults.', e);
     }
@@ -289,6 +292,7 @@ function loadSettings() {
   if (savedDest === 'r2' || savedDest === 'supabase') {
     setDestination(savedDest);
   }
+  updateGeminiStatusBadge();
 }
 
 // Save Settings to LocalStorage
@@ -312,6 +316,7 @@ function saveSettings() {
   }
 
   localStorage.setItem('basic_wallpaper_admin_settings', JSON.stringify(settings));
+  updateGeminiStatusBadge();
   showToast('Settings saved successfully!', 'success');
   
   // Re-initialize clients
@@ -474,20 +479,38 @@ function switchTab(tabId) {
     title.innerText = 'Send Broadcast Notifications';
     sub.innerText = 'Manage system alerts and push news directly to active desktop software installations';
     fetchNotifications();
+  } else if (tabId === 'theme') {
+    title.innerText = 'App Theme Change';
+    sub.innerText = 'Real-time control over color palettes of all running client desktop applications';
+  } else if (tabId === 'cursors') {
+    title.innerText = 'Cursor Management & Upload';
+    sub.innerText = 'Upload, preview, test, and moderate custom mouse cursor packs for Windows desktop clients';
+    fetchAdminCursors();
   }
 }
 
 // Storage Destination Selector Logic
 function setDestination(dest) {
   uploadDestination = dest;
+  cursorUploadDestination = dest;
   localStorage.setItem('basic_wallpaper_upload_dest', dest);
+  localStorage.setItem('basic_wallpaper_cursor_dest', dest);
   
-  document.querySelectorAll('.destination-toggle-group .toggle-btn').forEach(btn => btn.classList.remove('active'));
-  
+  const supaBtn = document.getElementById('dest-supabase');
+  const r2Btn = document.getElementById('dest-r2');
+  const cursorR2Btn = document.getElementById('cursor-dest-r2');
+  const cursorSupaBtn = document.getElementById('cursor-dest-supabase');
+
   if (dest === 'supabase') {
-    document.getElementById('dest-supabase').classList.add('active');
+    if (supaBtn) supaBtn.classList.add('active');
+    if (r2Btn) r2Btn.classList.remove('active');
+    if (cursorSupaBtn) cursorSupaBtn.classList.add('active');
+    if (cursorR2Btn) cursorR2Btn.classList.remove('active');
   } else {
-    document.getElementById('dest-r2').classList.add('active');
+    if (r2Btn) r2Btn.classList.add('active');
+    if (supaBtn) supaBtn.classList.remove('active');
+    if (cursorR2Btn) cursorR2Btn.classList.add('active');
+    if (cursorSupaBtn) cursorSupaBtn.classList.remove('active');
   }
 }
 
@@ -546,6 +569,422 @@ function setupFormBindings() {
   });
 }
 
+// Smart Auto-Categorization Heuristic (Fallback & Initial Tagging)
+function autoCategorize(title = '', tags = '', desc = '') {
+  const text = `${title} ${tags} ${desc}`.toLowerCase();
+  
+  // Super Heroes
+  if (/(spider-?man|batman|iron-?man|superman|avengers|marvel|dc\b|deadpool|wolverine|thor|hulk|captain america|venom|joker|thanos|flash\b|superhero|superheroes|gotham|justice league|hero)/i.test(text)) {
+    return 'Super Heroes';
+  }
+  // Anime & Manga
+  if (/(anime|manga|naruto|sasuke|goku|dragon ball|dbz|luffy|one piece|zoro|demon slayer|tanjiro|nezuko|rengoku|attack on titan|aot|eren|levi|mikasa|jujutsu kaisen|jjk|gojo|sukuna|itadori|chainsaw man|denji|makima|bleach|ichigo|death note|waifu|chibi|ghibli|genshin|honkai|evangelion|tokyo ghoul|sailor moon|cyberpunk edgerunners|arcane|jinx|solo leveling|sung jinwoo)/i.test(text)) {
+    return 'Anime';
+  }
+  // Cars & Vehicles
+  if (/(car|cars|supercar|hypercar|porsche|ferrari|lamborghini|bmw|audi|mercedes|amg|nissan|gtr|skyline|supra|toyota|mustang|ford|mclaren|bugatti|corvette|drift|racing|automotive|vehicle|motorcycle|superbike|yamaha|kawasaki|ducati)/i.test(text)) {
+    return 'Cars';
+  }
+  // Games & Gaming
+  if (/(game|gaming|gamer|cyberpunk 2077|witcher|valorant|elden ring|dark souls|halo|zelda|mario|pokemon|god of war|kratos|assassin'?s creed|overwatch|gta|grand theft auto|minecraft|fortnite|call of duty|cod|destiny|league of legends|lol\b|csgo|cs2|steam|playstation|xbox|nintendo|sekiro|resident evil|fallout)/i.test(text)) {
+    return 'Games';
+  }
+  // Nature & Landscapes
+  if (/(nature|forest|mountain|mountains|ocean|sea|beach|sunset|sunrise|river|lake|landscape|sky|clouds|rain|waterfall|space|galaxy|cosmos|nebula|stars|planet|earth|aurora|northern lights|flowers|tree|scenery|desert|snow|winter|autumn|spring|tropical)/i.test(text)) {
+    return 'Nature';
+  }
+  
+  return 'General';
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// Global callback for modal key save
+let pendingAICallback = null;
+
+function openGeminiKeyModal(callback = null) {
+  pendingAICallback = callback;
+  const modal = document.getElementById('gemini-key-modal');
+  const input = document.getElementById('modal-gemini-key');
+  if (input) input.value = settings.geminiApiKey || '';
+  if (modal) modal.classList.add('active');
+}
+
+function closeGeminiKeyModal() {
+  const modal = document.getElementById('gemini-key-modal');
+  if (modal) modal.classList.remove('active');
+  pendingAICallback = null;
+}
+
+function saveGeminiKeyModal() {
+  const input = document.getElementById('modal-gemini-key');
+  const key = (input ? input.value : '').trim();
+  if (!key) {
+    showToast('Please enter a valid Gemini API Key', 'warning');
+    return;
+  }
+  settings.geminiApiKey = key;
+  const settingsInput = document.getElementById('gemini-api-key');
+  if (settingsInput) settingsInput.value = key;
+  
+  localStorage.setItem('basic_wallpaper_admin_settings', JSON.stringify(settings));
+  updateGeminiStatusBadge();
+  showToast('Gemini API Key saved successfully!', 'success');
+  
+  const cb = pendingAICallback;
+  closeGeminiKeyModal();
+  if (typeof cb === 'function') {
+    cb();
+  }
+}
+
+function toggleModalKeyVisibility() {
+  const input = document.getElementById('modal-gemini-key');
+  if (input) {
+    input.type = input.type === 'password' ? 'text' : 'password';
+  }
+}
+
+function updateGeminiStatusBadge() {
+  const badge = document.getElementById('gemini-status-badge');
+  if (!badge) return;
+  if (settings.geminiApiKey && settings.geminiApiKey.trim()) {
+    badge.innerHTML = '✨ Gemini AI Active';
+    badge.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(127, 86, 217, 0.2))';
+    badge.style.borderColor = 'rgba(74, 222, 128, 0.4)';
+    badge.style.color = '#4ade80';
+  } else {
+    badge.innerHTML = '⚠️ Setup Gemini Key';
+    badge.style.background = 'linear-gradient(135deg, rgba(234, 179, 8, 0.15), rgba(239, 68, 68, 0.15))';
+    badge.style.borderColor = 'rgba(234, 179, 8, 0.4)';
+    badge.style.color = '#facc15';
+  }
+}
+
+function validateCategory(cat) {
+  const allowed = ['General', 'Games', 'Anime', 'Cars', 'Nature', 'Super Heroes'];
+  if (!cat) return null;
+  const match = allowed.find(c => c.toLowerCase() === String(cat).trim().toLowerCase());
+  return match || null;
+}
+
+// Call Google Gemini Multimodal Vision API for an image thumbnail or filename
+async function callGeminiVisionAPI(imageDataUrl, filename) {
+  const apiKey = (settings.geminiApiKey || '').trim();
+  if (!apiKey) {
+    throw new Error('MISSING_API_KEY');
+  }
+
+  let mimeType = '';
+  let base64Data = '';
+  
+  if (imageDataUrl && typeof imageDataUrl === 'string' && imageDataUrl.startsWith('data:image/') && !imageDataUrl.includes('svg')) {
+    try {
+      const parts = imageDataUrl.split(',');
+      if (parts.length === 2 && parts[1].length > 50) {
+        mimeType = parts[0].split(';')[0].split(':')[1] || 'image/jpeg';
+        base64Data = parts[1];
+      }
+    } catch (e) {
+      console.warn('Could not parse thumbnail base64:', e);
+    }
+  }
+
+  const promptText = `You are an elite wallpaper curator and tagger for a high-end 4K Desktop Live Wallpaper gallery.
+Analyze this wallpaper preview along with its original filename: "${filename}".
+
+Task:
+Identify the character names, anime title, video game, vehicle make/model, landscape scenery, aesthetic style, lighting, colors, and mood.
+
+Output the best metadata:
+1. "title": A polished, clean, highly attractive Title in Title Case (e.g., "Cyberpunk Neon Samurai", "Eren Yeager Attack Titan", "Acheron Honkai Star Rail", "Midnight Porsche 911 GT3", "Tokyo Rainy Alleyway", "Goku Ultra Instinct"). Strip away raw hash numbers, resolution tags like 3840x2160 or 4k, file extensions, and boilerplate words like "wallpaper" or "live".
+2. "category": Strictly choose ONE matching category from this list: ["General", "Games", "Anime", "Cars", "Nature", "Super Heroes"].
+3. "tags": 6 to 10 relevant, lowercase, comma-separated keywords for user search (e.g. "anime, honkai star rail, acheron, dark, glowing, katana, 4k").
+4. "description": A captivating, concise 1 to 2 sentence description highlighting the visual aesthetic, atmosphere, and mood.
+
+Return ONLY a valid JSON object matching this exact structure with no markdown or code blocks:
+{
+  "title": "...",
+  "category": "...",
+  "tags": "...",
+  "description": "..."
+}`;
+
+  // Assemble request parts: text prompt + inline image data if valid base64 is available
+  const parts = [{ text: promptText }];
+  if (base64Data && mimeType) {
+    parts.push({
+      inlineData: {
+        mimeType: mimeType,
+        data: base64Data
+      }
+    });
+  }
+
+  const models = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.5-flash-lite', 'gemini-3.7-flash', 'gemini-2.5-pro'];
+  let lastError = null;
+
+  for (const model of models) {
+    try {
+      let response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: {
+            responseMimeType: "application/json"
+          }
+        })
+      });
+
+      // If rate limited (429), pause and retry once
+      if (response.status === 429) {
+        console.warn(`Model ${model} hit rate limit (429). Retrying after 2s backoff...`);
+        await new Promise(r => setTimeout(r, 2000));
+        response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts }],
+            generationConfig: {
+              responseMimeType: "application/json"
+            }
+          })
+        });
+      }
+
+      if (response.ok) {
+        const data = await response.json();
+        const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!responseText) throw new Error('Empty AI response from Gemini');
+        
+        let parsed;
+        try {
+          parsed = JSON.parse(responseText.trim());
+        } catch (e) {
+          const cleaned = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+          parsed = JSON.parse(cleaned);
+        }
+        
+        return {
+          title: parsed.title || formatTitleFromName(filename),
+          category: validateCategory(parsed.category) || autoCategorize(parsed.title || filename),
+          tags: parsed.tags || '',
+          description: parsed.description || ''
+        };
+      } else {
+        const errText = await response.text();
+        let errorDetail = `HTTP ${response.status}`;
+        try {
+          const errObj = JSON.parse(errText);
+          if (errObj.error && errObj.error.message) {
+            errorDetail = errObj.error.message;
+          }
+        } catch (e) {
+          if (errText) errorDetail = errText.slice(0, 100);
+        }
+        console.warn(`Model ${model} returned error:`, errorDetail);
+        lastError = new Error(errorDetail);
+        
+        // If API key is invalid, don't waste time trying all other models
+        if (response.status === 400 && errorDetail.toLowerCase().includes('api key')) {
+          break;
+        }
+      }
+    } catch (e) {
+      console.warn(`Error trying ${model}:`, e);
+      lastError = e;
+    }
+  }
+
+  throw lastError || new Error('Failed to generate with Gemini AI');
+}
+
+// Generate AI metadata for a single item in queue
+async function generateAIMetadataForItem(itemId, silent = false) {
+  const item = uploadQueue.find(i => i.id === itemId);
+  if (!item) return false;
+
+  if (!settings.geminiApiKey || !settings.geminiApiKey.trim()) {
+    if (!silent) {
+      openGeminiKeyModal(() => generateAIMetadataForItem(itemId));
+    } else {
+      // Offline fallback: intelligent rule-based categorization
+      const fallbackCat = autoCategorize(item.title, item.tags, item.desc);
+      item.category = fallbackCat;
+      const catSelect = document.getElementById(`select-category-${item.id}`);
+      if (catSelect) catSelect.value = fallbackCat;
+    }
+    return false;
+  }
+
+  const card = document.getElementById(`card-${item.id}`);
+  const pill = document.getElementById(`ai-pill-${item.id}`);
+  const btn = document.getElementById(`btn-ai-card-${item.id}`);
+
+  if (card) card.classList.add('ai-processing');
+  if (pill) {
+    pill.className = 'ai-card-pill loading';
+    pill.innerHTML = '<span class="ai-spin">✨</span> AI Analyzing...';
+  }
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="ai-spin">⏳</span> Analyzing...';
+  }
+
+  try {
+    // Wait for thumbnail promise if still generating
+    if (item.thumbnailReady) {
+      try {
+        await Promise.race([
+          item.thumbnailReady,
+          new Promise(r => setTimeout(r, 4000))
+        ]);
+      } catch (e) {}
+    }
+
+    const aiResult = await callGeminiVisionAPI(item.thumbnailDataUrl, item.name);
+
+    if (aiResult) {
+      item.title = aiResult.title;
+      item.category = aiResult.category;
+      item.tags = aiResult.tags;
+      item.desc = aiResult.description;
+
+      // Update card UI inputs
+      const titleInput = document.getElementById(`input-title-${item.id}`);
+      const creatorInput = document.getElementById(`input-creator-${item.id}`);
+      const catSelect = document.getElementById(`select-category-${item.id}`);
+      const tagsInput = document.getElementById(`input-tags-${item.id}`);
+      const descInput = document.getElementById(`input-desc-${item.id}`);
+
+      if (titleInput) titleInput.value = item.title;
+      if (catSelect) catSelect.value = item.category;
+      if (tagsInput) tagsInput.value = item.tags;
+      if (descInput) descInput.value = item.desc;
+
+      if (pill) {
+        pill.className = 'ai-card-pill done';
+        pill.innerHTML = '✨ AI Generated';
+      }
+
+      if (!silent) {
+        showToast(`✨ AI generated metadata for "${item.title}"`, 'success');
+      }
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error('AI generation error for item:', item.name, err);
+    
+    // Graceful fallback on error so card still gets clean metadata
+    const fallbackTitle = formatTitleFromName(item.name);
+    const fallbackCat = autoCategorize(fallbackTitle, item.tags, item.desc);
+    if (!item.title || item.title === item.name) item.title = fallbackTitle;
+    item.category = fallbackCat;
+    
+    const titleInput = document.getElementById(`input-title-${item.id}`);
+    const catSelect = document.getElementById(`select-category-${item.id}`);
+    if (titleInput && !titleInput.value) titleInput.value = fallbackTitle;
+    if (catSelect) catSelect.value = fallbackCat;
+
+    if (pill) {
+      pill.className = 'ai-card-pill';
+      pill.innerHTML = '⚠️ AI Rate Limited (Click to retry)';
+    }
+    if (!silent) {
+      if (err.message === 'MISSING_API_KEY') {
+        openGeminiKeyModal(() => generateAIMetadataForItem(itemId));
+      } else {
+        showToast(`AI Notice: ${err.message}`, 'warning');
+      }
+    }
+    return false;
+  } finally {
+    if (card) card.classList.remove('ai-processing');
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '✨ AI Auto-Fill';
+    }
+  }
+}
+
+// Generate AI metadata for ALL queue items with controlled pacing
+async function generateAIMetadataForAll() {
+  if (uploadQueue.length === 0) {
+    showToast('Upload queue is empty. Drag or browse files first.', 'warning');
+    return;
+  }
+
+  if (!settings.geminiApiKey || !settings.geminiApiKey.trim()) {
+    openGeminiKeyModal(() => generateAIMetadataForAll());
+    return;
+  }
+
+  const btnBulk = document.getElementById('btn-bulk-ai-all');
+  const btnHeader = document.getElementById('btn-queue-header-ai');
+
+  const origBulkText = btnBulk ? btnBulk.innerHTML : '';
+  const origHeaderText = btnHeader ? btnHeader.innerHTML : '';
+
+  if (btnBulk) {
+    btnBulk.disabled = true;
+    btnBulk.innerHTML = '<span class="ai-spin">✨</span> AI Processing...';
+  }
+  if (btnHeader) {
+    btnHeader.disabled = true;
+    btnHeader.innerHTML = '<span class="ai-spin">✨</span> AI Processing...';
+  }
+
+  showToast(`✨ Starting AI auto-fill for ${uploadQueue.length} wallpapers...`, 'info');
+
+  let completed = 0;
+  let successCount = 0;
+  let failCount = 0;
+  const total = uploadQueue.length;
+
+  // Process sequentially with a small delay between requests to stay within free-tier rate limits
+  for (let i = 0; i < uploadQueue.length; i++) {
+    const item = uploadQueue[i];
+    const ok = await generateAIMetadataForItem(item.id, true);
+    if (ok) successCount++; else failCount++;
+    completed++;
+    
+    if (btnBulk) btnBulk.innerHTML = `<span class="ai-spin">✨</span> AI Analyzing (${completed}/${total})...`;
+    if (btnHeader) btnHeader.innerHTML = `<span class="ai-spin">✨</span> (${completed}/${total})...`;
+    
+    // 500ms delay between consecutive requests to avoid 429
+    if (i < uploadQueue.length - 1) {
+      await new Promise(r => setTimeout(r, 500));
+    }
+  }
+
+  if (btnBulk) {
+    btnBulk.disabled = false;
+    btnBulk.innerHTML = origBulkText;
+  }
+  if (btnHeader) {
+    btnHeader.disabled = false;
+    btnHeader.innerHTML = origHeaderText;
+  }
+
+  if (successCount === total) {
+    showToast(`✨ AI generated titles, tags & descriptions for all ${total} wallpapers!`, 'success');
+  } else if (successCount > 0) {
+    showToast(`✨ AI generated metadata for ${successCount}/${total} wallpapers (${failCount} fell back to smart tagging).`, 'success');
+  } else {
+    showToast(`⚠️ AI rate limit exceeded. Applied smart heuristic metadata. You can click retry anytime.`, 'warning');
+  }
+}
+
 // Process Uploaded Files to Queue list
 function handleUploadedFiles(files) {
   if (isUploading) {
@@ -554,6 +993,8 @@ function handleUploadedFiles(files) {
   }
   
   const filesArray = Array.from(files);
+  const autoAIToggle = document.getElementById('auto-ai-toggle');
+  const shouldAutoAI = autoAIToggle ? autoAIToggle.checked : true;
   
   filesArray.forEach(file => {
     const isVideo = file.type.startsWith('video/');
@@ -598,8 +1039,15 @@ function handleUploadedFiles(files) {
     uploadQueue.push(item);
     renderQueueCard(item);
     
-    // Generate thumbnail asynchronously; store the promise so upload can await it
+    // Generate thumbnail asynchronously
     item.thumbnailReady = generateThumbnail(item);
+
+    // If Auto AI is enabled, trigger AI generation as soon as thumbnail is captured
+    if (shouldAutoAI) {
+      item.thumbnailReady.then(() => {
+        generateAIMetadataForItem(item.id, true);
+      });
+    }
   });
   
   updateQueueUI();
@@ -613,9 +1061,7 @@ function generateUniqueId() {
 // Auto format clean titles
 function formatTitleFromName(filename) {
   let name = filename.substring(0, filename.lastIndexOf('.')) || filename;
-  // Replace underscores, dashes, dots with spaces
   name = name.replace(/[_\-\.]/g, ' ');
-  // Title Case
   return name.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
 }
 
@@ -673,23 +1119,33 @@ function renderQueueCard(item) {
     
     <!-- Right Column: Metadata Inputs & Status -->
     <div class="queue-details-edit">
-      <button class="card-remove-btn" onclick="removeFromQueue('${item.id}')">&times;</button>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <div class="card-ai-status" id="ai-status-${item.id}">
+          <span class="ai-card-pill" id="ai-pill-${item.id}">✨ Ready for AI</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button class="btn btn-ai-sm" id="btn-ai-card-${item.id}" onclick="generateAIMetadataForItem('${item.id}')" title="Analyze image with Gemini AI to generate title, category, tags & description">
+            ✨ AI Auto-Fill
+          </button>
+          <button class="card-remove-btn" onclick="removeFromQueue('${item.id}')" title="Remove from Queue">&times;</button>
+        </div>
+      </div>
       
       <div class="input-row" style="margin-bottom: 12px;">
         <div class="input-group" style="flex: 2;">
           <label>Wallpaper Title</label>
-          <input type="text" value="${item.title}" oninput="updateItemField('${item.id}', 'title', this.value)">
+          <input type="text" id="input-title-${item.id}" value="${escapeHtml(item.title)}" oninput="updateItemField('${item.id}', 'title', this.value)">
         </div>
         <div class="input-group" style="flex: 1;">
           <label>Creator</label>
-          <input type="text" value="${item.creator}" oninput="updateItemField('${item.id}', 'creator', this.value)">
+          <input type="text" id="input-creator-${item.id}" value="${escapeHtml(item.creator)}" oninput="updateItemField('${item.id}', 'creator', this.value)">
         </div>
       </div>
       
       <div class="input-row" style="margin-bottom: 16px;">
         <div class="input-group" style="flex: 1;">
           <label>Category</label>
-          <select style="background: #111116; color: #fff; border: 1px solid var(--border-panel); border-radius: 6px; padding: 10px; font-family: inherit; font-size: 14px; outline: none; transition: border-color 0.2s; color-scheme: dark;" onchange="updateItemField('${item.id}', 'category', this.value)">
+          <select id="select-category-${item.id}" style="background: #111116; color: #fff; border: 1px solid var(--border-panel); border-radius: 6px; padding: 10px; font-family: inherit; font-size: 14px; outline: none; transition: border-color 0.2s; color-scheme: dark;" onchange="updateItemField('${item.id}', 'category', this.value)">
             <option value="General" ${item.category === 'General' ? 'selected' : ''}>General</option>
             <option value="Games" ${item.category === 'Games' ? 'selected' : ''}>Games</option>
             <option value="Anime" ${item.category === 'Anime' ? 'selected' : ''}>Anime</option>
@@ -700,18 +1156,18 @@ function renderQueueCard(item) {
         </div>
         <div class="input-group" style="flex: 1;">
           <label>Format Type</label>
-          <select style="background: #111116; color: #fff; border: 1px solid var(--border-panel); border-radius: 6px; padding: 10px; font-family: inherit; font-size: 14px; outline: none; transition: border-color 0.2s; color-scheme: dark;" onchange="updateItemField('${item.id}', 'type', this.value); updateCardTypeBadge('${item.id}', this.value)">
+          <select id="select-type-${item.id}" style="background: #111116; color: #fff; border: 1px solid var(--border-panel); border-radius: 6px; padding: 10px; font-family: inherit; font-size: 14px; outline: none; transition: border-color 0.2s; color-scheme: dark;" onchange="updateItemField('${item.id}', 'type', this.value); updateCardTypeBadge('${item.id}', this.value)">
             <option value="video" ${item.type === 'video' ? 'selected' : ''}>Live (Video)</option>
             <option value="image" ${item.type === 'image' ? 'selected' : ''}>4K Wallpaper (Picture)</option>
           </select>
         </div>
         <div class="input-group" style="flex: 1;">
           <label>Tags (separated by comma)</label>
-          <input type="text" value="${item.tags}" placeholder="e.g. dynamic, colorful" oninput="updateItemField('${item.id}', 'tags', this.value)">
+          <input type="text" id="input-tags-${item.id}" value="${escapeHtml(item.tags)}" placeholder="e.g. dynamic, colorful" oninput="updateItemField('${item.id}', 'tags', this.value)">
         </div>
         <div class="input-group" style="flex: 2;">
           <label>Description</label>
-          <input type="text" value="${item.desc}" placeholder="Describe this wallpaper" oninput="updateItemField('${item.id}', 'desc', this.value)">
+          <input type="text" id="input-desc-${item.id}" value="${escapeHtml(item.desc)}" placeholder="Describe this wallpaper" oninput="updateItemField('${item.id}', 'desc', this.value)">
         </div>
       </div>
       
@@ -2089,6 +2545,14 @@ async function submitStrike() {
 window.submitStrike = submitStrike;
 
 async function fetchStrikes() {
+  if (!supabaseClient || !isServiceRoleKey(settings.supabaseKey)) {
+    settings.supabaseUrl = DEFAULT_SETTINGS.supabaseUrl;
+    settings.supabaseKey = DEFAULT_SETTINGS.supabaseKey;
+    localStorage.setItem('basic_wallpaper_admin_settings', JSON.stringify(settings));
+    if (typeof supabase !== 'undefined') {
+      supabaseClient = supabase.createClient(settings.supabaseUrl, settings.supabaseKey);
+    }
+  }
   if (!supabaseClient) return;
   const container   = document.getElementById('strikes-table-container');
   const blockedList = document.getElementById('blocked-creators-list');
@@ -2245,6 +2709,14 @@ function escapeJSString(str) {
 
 async function fetchReports() {
   const container = document.getElementById('reports-table-container');
+  if (!supabaseClient || !isServiceRoleKey(settings.supabaseKey)) {
+    settings.supabaseUrl = DEFAULT_SETTINGS.supabaseUrl;
+    settings.supabaseKey = DEFAULT_SETTINGS.supabaseKey;
+    localStorage.setItem('basic_wallpaper_admin_settings', JSON.stringify(settings));
+    if (typeof supabase !== 'undefined') {
+      supabaseClient = supabase.createClient(settings.supabaseUrl, settings.supabaseKey);
+    }
+  }
   if (!supabaseClient) {
     container.innerHTML = '<div class="strikes-empty"><div class="empty-icon">❌</div><p>Supabase client is not initialized. Please verify your connection settings in the Storage Settings tab.</p></div>';
     return;
@@ -2419,6 +2891,14 @@ window.dismissReport = dismissReport;
 
 async function fetchAppeals() {
   const container = document.getElementById('appeals-table-container');
+  if (!supabaseClient || !isServiceRoleKey(settings.supabaseKey)) {
+    settings.supabaseUrl = DEFAULT_SETTINGS.supabaseUrl;
+    settings.supabaseKey = DEFAULT_SETTINGS.supabaseKey;
+    localStorage.setItem('basic_wallpaper_admin_settings', JSON.stringify(settings));
+    if (typeof supabase !== 'undefined') {
+      supabaseClient = supabase.createClient(settings.supabaseUrl, settings.supabaseKey);
+    }
+  }
   if (!supabaseClient) {
     container.innerHTML = '<div class="strikes-empty"><div class="empty-icon">❌</div><p>Supabase client is not initialized. Please verify your connection settings in the Storage Settings tab.</p></div>';
     return;
@@ -2801,7 +3281,7 @@ async function professionalizeNotification() {
 Original Title: ${title || "System Update"}
 Original Message: ${message}`;
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -2844,5 +3324,646 @@ Original Message: ${message}`;
   }
 }
 window.professionalizeNotification = professionalizeNotification;
+
+
+// App Theme Customizer Preset Definitions
+const presets = {
+  default: {
+    accent: '#6c63ff',
+    accentLight: '#9b95ff',
+    bgDeep: '#0d0d0f',
+    bgPanel: '#161618',
+    bgCard: '#1e1e22',
+    bgHover: '#26262c',
+    textPrimary: '#f0f0f5',
+    textSecondary: '#8888a0',
+    border: '#2a2a33'
+  },
+  cyberpunk: {
+    accent: '#ec4899',
+    accentLight: '#f472b6',
+    bgDeep: '#0a0512',
+    bgPanel: '#120b24',
+    bgCard: '#1c103a',
+    bgHover: '#2a1a54',
+    textPrimary: '#00ffff',
+    textSecondary: '#a78bfa',
+    border: '#ec4899'
+  },
+  emerald: {
+    accent: '#00ff66',
+    accentLight: '#55ff99',
+    bgDeep: '#050c09',
+    bgPanel: '#0a1612',
+    bgCard: '#12251e',
+    bgHover: '#1c382e',
+    textPrimary: '#ffffff',
+    textSecondary: '#8aa69d',
+    border: '#00ff66'
+  },
+  midnight: {
+    accent: '#2563eb',
+    accentLight: '#60a5fa',
+    bgDeep: '#020617',
+    bgPanel: '#0f172a',
+    bgCard: '#1e293b',
+    bgHover: '#334155',
+    textPrimary: '#f8fafc',
+    textSecondary: '#94a3b8',
+    border: '#334155'
+  },
+  sakura: {
+    accent: '#fda4af',
+    accentLight: '#fecdd3',
+    bgDeep: '#0f050b',
+    bgPanel: '#1a0d15',
+    bgCard: '#2d1825',
+    bgHover: '#3d2233',
+    textPrimary: '#ffe4e6',
+    textSecondary: '#f43f5e',
+    border: '#e11d48'
+  },
+  sunset: {
+    accent: '#f97316',
+    accentLight: '#fdba74',
+    bgDeep: '#0c0404',
+    bgPanel: '#180a0a',
+    bgCard: '#271212',
+    bgHover: '#371a1a',
+    textPrimary: '#ffedd5',
+    textSecondary: '#f97316',
+    border: '#f97316'
+  },
+  synthwave: {
+    accent: '#06b6d4',
+    accentLight: '#67e8f9',
+    bgDeep: '#0f0212',
+    bgPanel: '#1c0724',
+    bgCard: '#2a0d36',
+    bgHover: '#3d164d',
+    textPrimary: '#f0abfc',
+    textSecondary: '#a855f7',
+    border: '#06b6d4'
+  },
+  amber: {
+    accent: '#f59e0b',
+    accentLight: '#fde68a',
+    bgDeep: '#0c0904',
+    bgPanel: '#181207',
+    bgCard: '#261c0c',
+    bgHover: '#362811',
+    textPrimary: '#fef3c7',
+    textSecondary: '#f59e0b',
+    border: '#f59e0b'
+  },
+  crimson: {
+    accent: '#ef4444',
+    accentLight: '#fca5a5',
+    bgDeep: '#0f0202',
+    bgPanel: '#1c0505',
+    bgCard: '#2d0a0a',
+    bgHover: '#3e1111',
+    textPrimary: '#fee2e2',
+    textSecondary: '#ef4444',
+    border: '#ef4444'
+  }
+};
+
+function applyPreset() {
+  const selected = document.getElementById('theme-preset').value;
+  if (selected === 'custom') return;
+  const p = presets[selected];
+  if (!p) return;
+
+  document.getElementById('color-accent').value = p.accent;
+  document.getElementById('hex-accent').value = p.accent;
+  document.getElementById('color-bg-deep').value = p.bgDeep;
+  document.getElementById('hex-bg-deep').value = p.bgDeep;
+  document.getElementById('color-bg-panel').value = p.bgPanel;
+  document.getElementById('hex-bg-panel').value = p.bgPanel;
+  document.getElementById('color-bg-card').value = p.bgCard;
+  document.getElementById('hex-bg-card').value = p.bgCard;
+}
+window.applyPreset = applyPreset;
+
+function resetThemeToDefault() {
+  const presetSel = document.getElementById('theme-preset');
+  if (presetSel) {
+    presetSel.value = 'default';
+    applyPreset();
+    publishTheme();
+  }
+}
+window.resetThemeToDefault = resetThemeToDefault;
+
+function syncColorInput(id) {
+  const hexVal = document.getElementById(`hex-${id}`).value;
+  if (/^#[0-9A-F]{6}$/i.test(hexVal)) {
+    document.getElementById(`color-${id}`).value = hexVal;
+    markCustom();
+  }
+}
+window.syncColorInput = syncColorInput;
+
+// Ensure color pickers sync their HEX text inputs
+document.addEventListener('DOMContentLoaded', () => {
+  ['accent', 'bg-deep', 'bg-panel', 'bg-card'].forEach(id => {
+    const picker = document.getElementById(`color-${id}`);
+    const text = document.getElementById(`hex-${id}`);
+    if (picker && text) {
+      picker.addEventListener('input', () => {
+        text.value = picker.value.toUpperCase();
+      });
+    }
+  });
+});
+
+function markCustom() {
+  const presetSel = document.getElementById('theme-preset');
+  if (presetSel) presetSel.value = 'custom';
+}
+window.markCustom = markCustom;
+
+async function publishTheme() {
+  if (!supabaseClient) {
+    showToast('Database not connected. Please save settings first.', 'danger');
+    return;
+  }
+
+  const selected = document.getElementById('theme-preset').value;
+  let themeObj = {};
+
+  if (selected !== 'custom') {
+    themeObj = { ...presets[selected] };
+  } else {
+    const accent = document.getElementById('color-accent').value;
+    const bgDeep = document.getElementById('color-bg-deep').value;
+    const bgPanel = document.getElementById('color-bg-panel').value;
+    const bgCard = document.getElementById('color-bg-card').value;
+
+    themeObj = {
+      BgDeep: bgDeep,
+      BgPanel: bgPanel,
+      BgCard: bgCard,
+      BgHover: adjustColorBrightness(bgCard, 10),
+      Accent: accent,
+      AccentLight: adjustColorBrightness(accent, 30),
+      TextPrimary: '#F0F0F5',
+      TextSecondary: '#8888A0',
+      Border: adjustColorBrightness(bgCard, 20)
+    };
+  }
+
+  const payload = {
+    BgDeep: themeObj.bgDeep || themeObj.BgDeep,
+    BgPanel: themeObj.bgPanel || themeObj.BgPanel,
+    BgCard: themeObj.bgCard || themeObj.BgCard,
+    BgHover: themeObj.bgHover || themeObj.BgHover,
+    Accent: themeObj.accent || themeObj.Accent,
+    AccentLight: themeObj.accentLight || themeObj.AccentLight,
+    TextPrimary: themeObj.textPrimary || themeObj.TextPrimary,
+    TextSecondary: themeObj.textSecondary || themeObj.TextSecondary,
+    Border: themeObj.border || themeObj.Border
+  };
+
+  try {
+    const { error } = await supabaseClient
+      .from('app_config')
+      .upsert({ key: 'app_theme', value: JSON.stringify(payload) });
+
+    if (error) throw error;
+
+    showToast('Theme published successfully! Running applications will update in real-time.', 'success');
+  } catch (err) {
+    console.error('Error publishing theme:', err.message);
+    showToast(`Failed to publish theme: ${err.message}`, 'danger');
+  }
+}
+window.publishTheme = publishTheme;
+
+function adjustColorBrightness(hex, percent) {
+  let R = parseInt(hex.substring(1, 3), 16);
+  let G = parseInt(hex.substring(3, 5), 16);
+  let B = parseInt(hex.substring(5, 7), 16);
+
+  R = parseInt(R * (100 + percent) / 100);
+  G = parseInt(G * (100 + percent) / 100);
+  B = parseInt(B * (100 + percent) / 100);
+
+  R = (R < 255) ? R : 255;
+  G = (G < 255) ? G : 255;
+  B = (B < 255) ? B : 255;
+
+  const rHex = (R.toString(16).length === 1) ? "0" + R.toString(16) : R.toString(16);
+  const gHex = (G.toString(16).length === 1) ? "0" + G.toString(16) : G.toString(16);
+  const bHex = (B.toString(16).length === 1) ? "0" + B.toString(16) : B.toString(16);
+
+  return "#" + rHex + gHex + bHex;
+}
+
+/* ==========================================================================
+   CURSOR MANAGEMENT & UPLOAD MODULE
+   ========================================================================== */
+let adminCursorsList = [];
+
+async function fetchAdminCursors() {
+  const container = document.getElementById('admin-cursors-grid');
+  if (!container) return;
+  container.innerHTML = '<div style="color: #94a3b8; padding: 20px; grid-column: 1 / -1;">Loading cursor library...</div>';
+
+  try {
+    // 1. Fetch from local cursors-manifest.json
+    const res = await fetch('cursors-manifest.json');
+    if (res.ok) {
+      const data = await res.json();
+      adminCursorsList = data.cursors || [];
+    } else {
+      adminCursorsList = [];
+    }
+
+    // 1b. Merge local storage cached cursors
+    try {
+      const cached = JSON.parse(localStorage.getItem('basic_wallpaper_admin_cursors') || '[]');
+      if (cached && cached.length > 0) {
+        const existingIds = new Set(adminCursorsList.map(c => c.id));
+        cached.forEach(item => {
+          if (!existingIds.has(item.id)) {
+            adminCursorsList.unshift(item);
+          }
+        });
+      }
+    } catch(e) {}
+
+    // 2. Fetch from Supabase community_cursors table
+    if (supabaseClient) {
+      try {
+        const { data: dbData, error } = await supabaseClient
+          .from('community_cursors')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (!error && dbData && dbData.length > 0) {
+          const existingIds = new Set(adminCursorsList.map(c => c.id));
+          dbData.forEach(item => {
+            if (!existingIds.has(item.id)) {
+              adminCursorsList.push({
+                id: item.id,
+                name: item.title,                          // community_cursors uses 'title'
+                creator: item.creator || 'Community',
+                cat: item.category || 'General',
+                type: item.is_animated ? 'ani' : 'cur',
+                desc: item.description || 'Custom cursor',
+                file: item.file_url,                       // community_cursors uses 'file_url'
+                created_at: item.created_at
+              });
+            }
+          });
+        }
+      } catch(e) {
+        console.warn('community_cursors fetch error:', e);
+      }
+    }
+
+    renderAdminCursors(adminCursorsList);
+  } catch (err) {
+    console.error('Error fetching admin cursors:', err);
+    renderAdminCursors(adminCursorsList);
+  }
+}
+
+function filterAdminCursors() {
+  const query = (document.getElementById('admin-cursor-search')?.value || '').toLowerCase();
+  const cat = document.getElementById('admin-cursor-cat-filter')?.value || 'all';
+
+  const filtered = adminCursorsList.filter(c => {
+    const matchQuery = !query || c.name.toLowerCase().includes(query) || (c.desc && c.desc.toLowerCase().includes(query)) || (c.creator && c.creator.toLowerCase().includes(query));
+    const matchCat = cat === 'all' || c.cat === cat;
+    return matchQuery && matchCat;
+  });
+
+  renderAdminCursors(filtered);
+}
+
+function renderAdminCursors(list) {
+  const container = document.getElementById('admin-cursors-grid');
+  if (!container) return;
+
+  if (!list || list.length === 0) {
+    container.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #94a3b8; background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.08); border-radius: 12px;">
+        <div style="font-size: 2rem; margin-bottom: 8px;">🖱️</div>
+        <div style="font-size: 1rem; font-weight: 600; color: #fff;">No custom cursors found</div>
+        <div style="font-size: 0.85rem; margin-top: 4px;">Use the form above to upload your first cursor pack.</div>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = list.map(c => {
+    const isImagePreviewable = /\.(png|webp|jpg|jpeg|svg)$/i.test(c.file || '');
+    const isAnimated = /\.ani$/i.test(c.file || '') || c.type === 'ani';
+    const fileExt = (c.type || (c.file || '').split('.').pop() || 'cur').toUpperCase();
+    
+    const previewContent = isImagePreviewable
+      ? `<img src="${c.file}" alt="${c.name}" style="max-width:80px;max-height:80px;object-fit:contain;border-radius:6px;image-rendering:pixelated;" onerror="this.style.display='none';this.parentNode.querySelector('.fallback-icon').style.display='flex'"><div class="fallback-icon" style="display:none;flex-direction:column;align-items:center;gap:4px;"><span style="font-size:2rem;">${isAnimated ? '💫' : '🖱️'}</span><span style="font-size:0.65rem;color:#a482f4;font-weight:700;padding:3px 8px;background:rgba(127,86,217,0.2);border-radius:8px;">${fileExt}</span></div>`
+      : `<div style="display:flex;flex-direction:column;align-items:center;gap:6px;"><span style="font-size:2.2rem;">${isAnimated ? '💫' : '🖱️'}</span><span style="font-size:0.65rem;color:#a482f4;font-weight:700;padding:3px 8px;background:rgba(127,86,217,0.2);border-radius:8px;">${fileExt}</span></div>`;
+
+    return `
+    <div class="glass-panel" style="padding: 16px; display: flex; flex-direction: column; justify-content: space-between; position: relative;">
+      <div>
+        <div style="width: 100%; height: 110px; background: radial-gradient(circle at center, rgba(127, 86, 217, 0.15), rgba(10, 8, 20, 0.9)); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; cursor: url('${c.file}'), auto; border: 1px solid rgba(255,255,255,0.08); transition: border-color 0.2s; overflow: hidden;" onmouseover="this.style.borderColor='#7F56D9'" onmouseout="this.style.borderColor='rgba(255,255,255,0.08)'">
+          ${previewContent}
+          <span style="font-size: 0.62rem; color: #64748b; margin-top: 2px;">Hover to test cursor</span>
+        </div>
+
+        <div style="margin-top: 12px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+            <h4 style="font-size: 0.95rem; font-weight: 700; color: #fff; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="${c.name}">${c.name}</h4>
+            <span style="background: rgba(127, 86, 217, 0.2); color: #c4b5fd; font-size: 0.65rem; font-weight: 700; padding: 2px 6px; border-radius: 10px; text-transform: uppercase;">.${c.type || fileExt.toLowerCase()}</span>
+          </div>
+          <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 6px;">By ${c.creator || 'Community'} • <span style="color: #7F56D9;">${c.cat || 'General'}</span></div>
+          <div style="font-size: 0.78rem; color: #cbd5e1; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${c.desc || 'Custom mouse cursor pack'}</div>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 6px; margin-top: 14px; flex-wrap: wrap;">
+        <button class="btn" onclick="testWebCursor('${c.file}', '${(c.name || '').replace(/'/g, "\\'")}')" style="flex: 1; padding: 7px; font-size: 0.75rem; font-weight: 600; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff; border-radius: 6px; cursor: pointer;">
+          👁️ Test
+        </button>
+        <button class="btn" onclick="copyCursorUrl('${c.file}')" style="flex: 1; padding: 7px; font-size: 0.75rem; font-weight: 600; background: rgba(127, 86, 217, 0.15); border: 1px solid rgba(127, 86, 217, 0.3); color: #c4b5fd; border-radius: 6px; cursor: pointer;">
+          🔗 Link
+        </button>
+        <button class="btn" onclick="deleteAdminCursor('${c.id}')" style="padding: 7px 10px; font-size: 0.75rem; font-weight: 600; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; border-radius: 6px; cursor: pointer;">
+          🗑️
+        </button>
+      </div>
+    </div>
+  `}).join('');
+}
+
+let cursorBatchQueue = [];
+
+function handleAdminCursorFileSelect(files) {
+  if (!files || files.length === 0) return;
+
+  const validExts = ['cur', 'ani', 'png', 'webp', 'svg', 'jpg', 'jpeg'];
+  const creator = document.getElementById('cursor-creator')?.value.trim() || 'Pavan Am';
+  const cat = document.getElementById('cursor-category')?.value || 'Minimal';
+  const desc = document.getElementById('cursor-desc')?.value.trim() || 'Custom mouse cursor pack';
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!validExts.includes(ext)) continue;
+
+    const cleanTitle = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+
+    cursorBatchQueue.push({
+      file,
+      name: cleanTitle,
+      creator,
+      cat,
+      type: ext,
+      desc,
+      status: 'pending',
+      progress: 0
+    });
+  }
+
+  renderCursorQueue();
+}
+
+function renderCursorQueue() {
+  const container = document.getElementById('cursor-queue-container');
+  const listEl = document.getElementById('cursor-queue-list');
+  const countEl = document.getElementById('cursor-queue-count');
+  const btnCountEl = document.getElementById('cursor-queue-btn-count');
+
+  if (!container || !listEl) return;
+
+  if (cursorBatchQueue.length === 0) {
+    container.style.display = 'none';
+    return;
+  }
+
+  container.style.display = 'block';
+  if (countEl) countEl.innerText = cursorBatchQueue.length;
+  if (btnCountEl) btnCountEl.innerText = cursorBatchQueue.length;
+
+  listEl.innerHTML = cursorBatchQueue.map((item, idx) => `
+    <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+      <div style="display: flex; align-items: center; gap: 10px; flex: 1; overflow: hidden;">
+        <span style="font-size: 1.2rem;">🖱️</span>
+        <div style="overflow: hidden;">
+          <div style="font-size: 0.85rem; font-weight: 700; color: #fff; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${item.name}</div>
+          <div style="font-size: 0.72rem; color: #94a3b8;">.${item.type} • ${(item.file.size / 1024).toFixed(1)} KB • ${item.creator}</div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="background: ${item.status === 'success' ? 'rgba(34,197,94,0.2)' : item.status === 'uploading' ? 'rgba(59,130,246,0.2)' : 'rgba(127, 86, 217, 0.2)'}; color: ${item.status === 'success' ? '#4ade80' : item.status === 'uploading' ? '#60a5fa' : '#c4b5fd'}; font-size: 0.65rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; text-transform: uppercase;">${item.status}</span>
+        <button onclick="removeCursorQueueItem(${idx})" style="background: none; border: none; color: #f87171; font-size: 0.9rem; cursor: pointer; padding: 2px 6px;">✕</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function removeCursorQueueItem(idx) {
+  cursorBatchQueue.splice(idx, 1);
+  renderCursorQueue();
+}
+
+function setCursorDestination(dest) {
+  setDestination(dest);
+  showToast(`Cursor upload destination set to ${dest === 'r2' ? 'Cloudflare R2' : 'Supabase Storage'}`, 'info');
+}
+
+function clearCursorQueue() {
+  cursorBatchQueue = [];
+  renderCursorQueue();
+
+  const f1 = document.getElementById('cursor-upload-file');
+  const f2 = document.getElementById('cursor-folder-file');
+  if (f1) f1.value = '';
+  if (f2) f2.value = '';
+}
+
+async function uploadCursorFromAdmin() {
+  const btn = document.getElementById('btn-upload-cursor');
+
+  if (cursorBatchQueue.length === 0) {
+    showToast('Please select at least one cursor file to upload.', 'warning');
+    return;
+  }
+
+  const btnOriginalText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Batch Uploading Cursors...';
+
+  let successCount = 0;
+
+  for (let i = 0; i < cursorBatchQueue.length; i++) {
+    const item = cursorBatchQueue[i];
+    item.status = 'uploading';
+    renderCursorQueue();
+
+    try {
+      let publicUrl = '';
+      const cleanFileName = `cursors/${Date.now()}_${item.file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+
+      if (cursorUploadDestination === 'supabase' && supabaseClient) {
+        // Upload to Supabase Storage Bucket
+        const { data, error } = await supabaseClient.storage
+          .from(settings.supabaseWallpapersBucket || 'wallpapers')
+          .upload(cleanFileName, item.file, { contentType: item.file.type || 'application/octet-stream' });
+
+        if (error) throw new Error(`Supabase Storage upload failed: ${error.message}`);
+
+        publicUrl = supabaseClient.storage
+          .from(settings.supabaseWallpapersBucket || 'wallpapers')
+          .getPublicUrl(cleanFileName).data.publicUrl;
+      } else {
+        // Upload to Cloudflare R2 via dedicated cursor worker
+        // ⚠️  Deploy cursor-worker.js to Cloudflare then update this URL:
+        const CURSOR_WORKER_URL = 'https://cursor-upload-worker.pavanam926.workers.dev';
+        const formData = new FormData();
+        formData.append('type', 'media');
+        formData.append('filename', cleanFileName);
+        formData.append('file', item.file);
+        
+        const resp = await fetch(CURSOR_WORKER_URL, { method: 'POST', body: formData });
+        if (!resp.ok) throw new Error(`Cloudflare R2 upload failed: ${resp.statusText}`);
+        const r2Data = await resp.json();
+        // Use exact URL returned by worker — this is the real storage location
+        publicUrl = r2Data.url;
+        if (!publicUrl) throw new Error('Worker did not return a URL. Check R2 worker config.');
+        console.log(`[Cursor Upload] File stored at: ${publicUrl}`);
+      }
+
+      const newCursor = {
+        id: `cursor_${Date.now()}_${i}_${Math.random().toString(36).substring(2, 7)}`,
+        name: item.name,
+        creator: item.creator,
+        cat: item.cat,
+        type: item.type,
+        desc: item.desc,
+        file: publicUrl,
+        created_at: new Date().toISOString()
+      };
+
+      // Insert into community_cursors table with correct schema (UUID auto-generated)
+      try {
+        if (supabaseClient) {
+          const isAnimated = item.type === 'ani' || /\.ani$/i.test(publicUrl);
+          const { error: insertErr } = await supabaseClient.from('community_cursors').insert([{
+            title: item.name,                    // required TEXT NOT NULL
+            creator: item.creator || 'Pavan Am', // required TEXT NOT NULL
+            description: item.desc || '',
+            category: item.cat || 'General',
+            file_url: publicUrl,                 // required TEXT NOT NULL
+            preview_emoji: isAnimated ? '💫' : '🖱️',
+            is_animated: isAnimated,
+            tags: item.cat || ''
+          }]);
+          if (insertErr) console.warn('Supabase insert error:', insertErr.message, insertErr.details);
+        }
+      } catch (dbErr) {
+        console.warn('Supabase community_cursors insert error:', dbErr);
+      }
+
+      adminCursorsList.unshift(newCursor);
+      // Persist to local storage cache so uploaded cursors are instantly saved
+      try {
+        localStorage.setItem('basic_wallpaper_admin_cursors', JSON.stringify(adminCursorsList));
+      } catch(e) {}
+
+      item.status = 'success';
+      successCount++;
+    } catch (err) {
+      console.error(`Error uploading cursor ${item.name}:`, err);
+      item.status = 'failed';
+    }
+  }
+
+  renderAdminCursors(adminCursorsList);
+  showToast(`Successfully batch uploaded ${successCount} cursor pack(s)!`, 'success');
+
+  cursorBatchQueue = cursorBatchQueue.filter(item => item.status === 'failed');
+  renderCursorQueue();
+
+  btn.disabled = false;
+  btn.innerHTML = btnOriginalText;
+}
+
+function deleteAdminCursor(id) {
+  if (!confirm('Are you sure you want to delete this cursor from the library?')) return;
+
+  adminCursorsList = adminCursorsList.filter(c => c.id !== id);
+  renderAdminCursors(adminCursorsList);
+
+  if (supabaseClient) {
+    supabaseClient.from('cursors').delete().eq('id', id).catch(() => {});
+  }
+
+  showToast('Cursor deleted from library', 'info');
+}
+
+function copyCursorUrl(url) {
+  navigator.clipboard.writeText(url).then(() => {
+    showToast('Cursor download link copied to clipboard!', 'success');
+  }).catch(() => {
+    prompt('Copy cursor URL:', url);
+  });
+}
+
+function testWebCursor(url, name) {
+  const lbl = document.getElementById('lblActiveCursorName');
+  if (lbl) lbl.innerText = name;
+
+  const ext = (url.split('.').pop() || '').toLowerCase();
+
+  // .ani files are NOT supported as CSS cursors in any browser — warn user
+  if (ext === 'ani') {
+    showToast(`⚠️ .ANI files cannot be used as web cursors. They work in Windows apps only. Try hovering the preview box instead.`, 'warning');
+    return;
+  }
+
+  // Inject a page-wide <style> override that beats any CSS specificity
+  let styleTag = document.getElementById('__cursor_override_style__');
+  if (!styleTag) {
+    styleTag = document.createElement('style');
+    styleTag.id = '__cursor_override_style__';
+    document.head.appendChild(styleTag);
+  }
+  styleTag.textContent = `
+    *, *::before, *::after, body, html, button, a, input, select, textarea, [role] {
+      cursor: url('${url}'), auto !important;
+    }
+  `;
+
+  showToast(`🖱️ Cursor set to: ${name} — move your mouse to see it`, 'success');
+}
+
+function resetWebCursor() {
+  const lbl = document.getElementById('lblActiveCursorName');
+  if (lbl) lbl.innerText = 'Default Windows Arrow';
+
+  const styleTag = document.getElementById('__cursor_override_style__');
+  if (styleTag) styleTag.remove();
+
+  document.body.style.cursor = 'default';
+  showToast('Reset to default cursor', 'info');
+}
+
+// Expose AI Auto-Fill helpers to window
+window.generateAIMetadataForItem = generateAIMetadataForItem;
+window.generateAIMetadataForAll = generateAIMetadataForAll;
+window.openGeminiKeyModal = openGeminiKeyModal;
+window.closeGeminiKeyModal = closeGeminiKeyModal;
+window.saveGeminiKeyModal = saveGeminiKeyModal;
+window.toggleModalKeyVisibility = toggleModalKeyVisibility;
+window.autoCategorize = autoCategorize;
+
+
+
 
 

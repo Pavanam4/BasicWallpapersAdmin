@@ -80,6 +80,14 @@
           <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           Send Notifications
         </button>
+        <button class="nav-btn" id="btn-tab-theme" onclick="switchTab('theme')">
+          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22C17.5228 22 22 17.5228 22 12C22 11.5 21.5 11 21 11H19C17.9 11 17 10.1 17 9C17 8.5 17.2 8.1 17.5 7.8L18.9 6.4C19.3 6 19.3 5.3 18.9 4.9L17.1 3.1C16.7 2.7 16 2.7 15.6 3.1L14.2 4.5C13.9 4.8 13.5 5 13 5C11.9 5 11 4.1 11 3V1C11 0.5 10.5 0 10 0H8C7.5 0 7 0.5 7 1V3C7 4.1 6.1 5 5 5C4.5 5 4.1 4.8 3.8 4.5L2.4 3.1C2 2.7 1.3 2.7 0.9 3.1L0.9 3.1C0.5 3.5 0.5 4.2 0.9 4.6L2.3 6C2.6 6.3 2.8 6.7 2.8 7.2C2.8 8.3 1.9 9.2 0.8 9.2H0C0 14.7 4.5 19.2 10 19.2" stroke="currentColor" stroke-width="2"/></svg>
+          App Theme Change
+        </button>
+        <button class="nav-btn" id="btn-tab-cursors" onclick="switchTab('cursors')">
+          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg>
+          Cursor Management & Upload
+        </button>
       </nav>
 
       <div class="sidebar-footer">
@@ -121,11 +129,11 @@
             <div class="glass-panel storage-selector-panel">
               <h3>Upload Destination</h3>
               <div class="destination-toggle-group">
-                <button class="toggle-btn active" id="dest-supabase" onclick="setDestination('supabase')">
+                <button class="toggle-btn" id="dest-supabase" onclick="setDestination('supabase')">
                   <span class="btn-icon">⚡</span>
                   Supabase Storage
                 </button>
-                <button class="toggle-btn" id="dest-r2" onclick="setDestination('r2')">
+                <button class="toggle-btn active" id="dest-r2" onclick="setDestination('r2')">
                   <span class="btn-icon">☁️</span>
                   Cloudflare R2
                 </button>
@@ -134,9 +142,14 @@
 
             <!-- Global Metadata (Bulk Edit) -->
             <div class="glass-panel bulk-edit-panel">
-              <div class="panel-header-action">
-                <h3>Bulk Edit Metadata</h3>
-                <span class="hint">Apply fields to all items in queue</span>
+              <div class="panel-header-action" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <h3>Bulk Edit Metadata</h3>
+                  <span class="ai-badge" id="gemini-status-badge" onclick="openGeminiKeyModal()" style="cursor: pointer;" title="Configure Gemini AI API Key">
+                    ✨ AI Assistant Active
+                  </span>
+                </div>
+                <span class="hint">Apply fields or let AI auto-generate</span>
               </div>
               <div class="form-grid">
                 <div class="input-group">
@@ -172,8 +185,17 @@
                   <input type="text" id="bulk-desc" placeholder="e.g. Premium cinematic live loop.">
                 </div>
               </div>
-              <div class="panel-footer">
-                <button class="btn btn-secondary" onclick="applyBulkMetadata()">Apply to All Queue</button>
+              <div class="panel-footer" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 14px;">
+                <label class="ai-toggle-switch" style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; color: #d1d5db; user-select: none;">
+                  <input type="checkbox" id="auto-ai-toggle" checked style="accent-color: #a855f7; width: 16px; height: 16px; cursor: pointer;">
+                  <span style="font-weight: 500;">✨ Auto-generate with AI when files are dropped</span>
+                </label>
+                <div style="display: flex; gap: 10px;">
+                  <button class="btn btn-ai" id="btn-bulk-ai-all" onclick="generateAIMetadataForAll()" title="Use Gemini AI to analyze all items in the queue">
+                    <span>✨</span> AI Auto-Fill Entire Queue
+                  </button>
+                  <button class="btn btn-secondary" onclick="applyBulkMetadata()">Apply to All Queue</button>
+                </div>
               </div>
             </div>
           </div>
@@ -198,7 +220,12 @@
           <!-- Upload Queue List -->
           <div class="queue-section" id="queue-section" style="display: none;">
             <div class="queue-header">
-              <h3>Upload Queue (<span id="queue-count">0</span> files)</h3>
+              <div style="display: flex; align-items: center; gap: 14px;">
+                <h3>Upload Queue (<span id="queue-count">0</span> files)</h3>
+                <button class="btn btn-ai btn-ai-sm" id="btn-queue-header-ai" onclick="generateAIMetadataForAll()" title="Analyze images with Gemini AI and auto-fill titles, categories, tags & descriptions">
+                  ✨ AI Auto-Fill All
+                </button>
+              </div>
               <div class="queue-actions">
                 <button class="btn btn-danger" onclick="clearQueue()">Clear Queue</button>
                 <button class="btn btn-primary btn-glow" id="start-upload-btn" onclick="startBatchUpload()">🚀 Start Batch Upload</button>
@@ -500,6 +527,236 @@
           </div>
         </section>
 
+        <!-- 8. APP THEME TAB -->
+        <section class="tab-content" id="tab-theme">
+          <div style="display: flex; flex-direction: column; gap: 32px; max-width: 800px; margin: 0 auto;">
+            <div class="glass-panel settings-card" style="padding: 32px;">
+              <div class="card-header" style="display: flex; gap: 16px; align-items: center; margin-bottom: 24px;">
+                <span class="provider-logo" style="font-size: 2.5rem; line-height: 1;">🎨</span>
+                <div>
+                  <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.4rem; font-weight: 700; margin: 0; color: #fff;">App Theme Change</h3>
+                  <p style="font-size: 0.85rem; color: #a1a1aa; margin: 4px 0 0 0; line-height: 1.4;">Real-time control over color palettes of all running client desktop applications.</p>
+                </div>
+              </div>
+
+              <div class="form-container" style="display: flex; flex-direction: column; gap: 20px;">
+                <div class="input-group">
+                  <label for="theme-preset" style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 0.85rem; color: #e4e4e7;">Theme Preset</label>
+                  <select id="theme-preset" onchange="applyPreset()" style="width: 100%; padding: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; outline: none; box-sizing: border-box; font-family: inherit; font-size: 0.9rem;">
+                    <option value="custom">Custom Colors</option>
+                    <option value="default" selected>Default Purple</option>
+                    <option value="cyberpunk">Cyberpunk Neon</option>
+                    <option value="emerald">Emerald Dream</option>
+                    <option value="midnight">Midnight Blue</option>
+                    <option value="sakura">Sakura Blossom</option>
+                    <option value="sunset">Sunset Breeze</option>
+                    <option value="synthwave">Synthwave Retro</option>
+                    <option value="amber">Amber Gold</option>
+                    <option value="crimson">Crimson Fury</option>
+                  </select>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+                  <div class="input-group">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 0.85rem; color: #e4e4e7;">Accent Color</label>
+                    <div style="display: flex; gap: 8px;">
+                      <input type="color" id="color-accent" value="#6c63ff" style="width: 40px; height: 40px; border: 0; background: transparent; cursor: pointer; padding: 0;" onchange="markCustom()">
+                      <input type="text" id="hex-accent" value="#6c63ff" style="width: 100%; padding: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; font-family: monospace;" onchange="syncColorInput('accent')">
+                    </div>
+                  </div>
+
+                  <div class="input-group">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 0.85rem; color: #e4e4e7;">Deep Background</label>
+                    <div style="display: flex; gap: 8px;">
+                      <input type="color" id="color-bg-deep" value="#0d0d0f" style="width: 40px; height: 40px; border: 0; background: transparent; cursor: pointer; padding: 0;" onchange="markCustom()">
+                      <input type="text" id="hex-bg-deep" value="#0d0d0f" style="width: 100%; padding: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; font-family: monospace;" onchange="syncColorInput('bg-deep')">
+                    </div>
+                  </div>
+
+                  <div class="input-group">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 0.85rem; color: #e4e4e7;">Panel Background</label>
+                    <div style="display: flex; gap: 8px;">
+                      <input type="color" id="color-bg-panel" value="#161618" style="width: 40px; height: 40px; border: 0; background: transparent; cursor: pointer; padding: 0;" onchange="markCustom()">
+                      <input type="text" id="hex-bg-panel" value="#161618" style="width: 100%; padding: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; font-family: monospace;" onchange="syncColorInput('bg-panel')">
+                    </div>
+                  </div>
+
+                  <div class="input-group">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 0.85rem; color: #e4e4e7;">Card Background</label>
+                    <div style="display: flex; gap: 8px;">
+                      <input type="color" id="color-bg-card" value="#1e1e22" style="width: 40px; height: 40px; border: 0; background: transparent; cursor: pointer; padding: 0;" onchange="markCustom()">
+                      <input type="text" id="hex-bg-card" value="#1e1e22" style="width: 100%; padding: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; font-family: monospace;" onchange="syncColorInput('bg-card')">
+                    </div>
+                  </div>
+                </div>
+
+                <div style="display: flex; gap: 12px; margin-top: 10px;">
+                  <button class="btn" onclick="resetThemeToDefault()" style="flex: 1; font-weight: 700; padding: 14px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff; font-size: 0.95rem; transition: background 0.2s;">
+                    Reset to Default
+                  </button>
+                  <button class="btn btn-primary" onclick="publishTheme()" style="flex: 1; font-weight: 700; padding: 14px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(135deg, #7F56D9, #98A2B3); border: none; color: #fff; font-size: 0.95rem; transition: opacity 0.2s;">
+                    🚀 Publish Theme Change
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 9. CURSOR UPLOAD & MANAGEMENT TAB -->
+        <section class="tab-content" id="tab-cursors">
+          <!-- Control & Upload Row -->
+          <div class="control-row" style="grid-template-columns: 1fr 1fr;">
+            
+            <!-- Cursor Upload Form Panel -->
+            <div class="glass-panel" style="padding: 24px;">
+              <div class="panel-header-action" style="margin-bottom: 16px;">
+                <h3>Bulk Upload Custom Cursors</h3>
+                <span class="hint">Select multiple .cur, .ani, .png, or .webp mouse cursor files at once</span>
+              </div>
+              
+              <!-- Storage Destination Selector for Cursors -->
+              <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px; margin-bottom: 16px;">
+                <div style="font-size: 0.8rem; font-weight: 700; color: #c4b5fd; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Cursor Upload Destination</div>
+                <div class="destination-toggle-group row-layout">
+                  <button class="toggle-btn active" id="cursor-dest-r2" onclick="setCursorDestination('r2')">
+                    <span class="btn-icon">☁️</span>
+                    Cloudflare R2
+                  </button>
+                  <button class="toggle-btn" id="cursor-dest-supabase" onclick="setCursorDestination('supabase')">
+                    <span class="btn-icon">⚡</span>
+                    Supabase Storage
+                  </button>
+                </div>
+              </div>
+              
+              <!-- Drag and Drop Dropzone for Cursors -->
+              <div class="drop-zone" id="cursor-drop-zone" style="border: 2px dashed var(--border-panel); border-radius: 12px; padding: 24px; text-align: center; background: rgba(255,255,255,0.02); transition: all 0.2s ease; margin-bottom: 16px;">
+                <input type="file" id="cursor-upload-file" multiple accept=".cur,.ani,.png,.webp,.svg,.jpg" onchange="handleAdminCursorFileSelect(this.files)" style="display: none;">
+                <input type="file" id="cursor-folder-file" webkitdirectory directory multiple onchange="handleAdminCursorFileSelect(this.files)" style="display: none;">
+                
+                <div style="font-size: 2.2rem; margin-bottom: 8px;">🖱️</div>
+                <h4 style="font-size: 1rem; font-weight: 700; color: #fff; margin-bottom: 4px;">Drag & Drop multiple cursor files here</h4>
+                <p style="color: #94a3b8; font-size: 0.82rem; margin-bottom: 14px;">Select multiple files (.cur, .ani, .png, .webp, .svg)</p>
+                
+                <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                  <button class="btn btn-primary" onclick="document.getElementById('cursor-upload-file').click()" style="padding: 10px 20px; font-weight: 700; border-radius: 8px; cursor: pointer; background: linear-gradient(135deg, #7F56D9, #98A2B3); border: none; color: #fff; font-size: 0.85rem;">
+                    📁 Select Multiple Files
+                  </button>
+                  <button class="btn" onclick="document.getElementById('cursor-folder-file').click()" style="padding: 10px 18px; font-weight: 600; border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-size: 0.85rem;">
+                    📂 Upload Cursor Folder
+                  </button>
+                </div>
+              </div>
+
+              <!-- Default / Global Metadata Controls for Queue -->
+              <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px; margin-bottom: 16px;">
+                <div style="font-size: 0.8rem; font-weight: 700; color: #c4b5fd; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">Default Metadata for Queue</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                  <div class="input-group">
+                    <label for="cursor-creator" style="font-size: 0.78rem;">Creator Name</label>
+                    <input type="text" id="cursor-creator" placeholder="e.g. Pavan Am" value="Pavan Am" style="padding: 8px;">
+                  </div>
+                  <div class="input-group">
+                    <label for="cursor-category" style="font-size: 0.78rem;">Category</label>
+                    <select id="cursor-category" style="background: rgba(255, 255, 255, 0.05); color: #fff; border: 1px solid var(--border-panel); border-radius: 6px; padding: 8px; font-family: inherit; font-size: 13px; outline: none; color-scheme: dark;">
+                      <option value="Minimal">Minimal</option>
+                      <option value="Precision">Precision</option>
+                      <option value="Games">Games</option>
+                      <option value="Fantasy">Fantasy</option>
+                      <option value="Animated">Animated</option>
+                      <option value="Anime">Anime</option>
+                      <option value="Cyberpunk">Cyberpunk</option>
+                      <option value="Custom">Custom</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="input-group" style="margin-top: 8px;">
+                  <label for="cursor-desc" style="font-size: 0.78rem;">Default Description</label>
+                  <input type="text" id="cursor-desc" placeholder="e.g. Premium custom mouse cursor pack" style="padding: 8px;">
+                </div>
+              </div>
+
+              <!-- Selected Cursor Files Queue List -->
+              <div id="cursor-queue-container" style="display: none; margin-top: 14px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                  <div style="font-weight: 700; color: #fff; font-size: 0.9rem;">
+                    Selected Queue (<span id="cursor-queue-count" style="color: #7F56D9;">0</span> files)
+                  </div>
+                  <div style="display: flex; gap: 8px;">
+                    <button class="btn" onclick="clearCursorQueue()" style="padding: 4px 10px; font-size: 0.75rem; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; border-radius: 6px; cursor: pointer;">Clear Queue</button>
+                  </div>
+                </div>
+
+                <div id="cursor-queue-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; padding-right: 4px; margin-bottom: 14px;">
+                  <!-- Dynamically populated queue items -->
+                </div>
+
+                <button class="btn btn-primary" id="btn-upload-cursor" onclick="uploadCursorFromAdmin()" style="width: 100%; font-weight: 700; padding: 14px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(135deg, #7F56D9, #98A2B3); border: none; color: #fff; font-size: 0.95rem; transition: opacity 0.2s;">
+                  🚀 Start Batch Upload (<span id="cursor-queue-btn-count">0</span> Cursors)
+                </button>
+              </div>
+
+            </div>
+
+            <!-- Web Cursor Live Tester & Info Card -->
+            <div class="glass-panel" style="padding: 24px; display: flex; flex-direction: column; justify-content: space-between;">
+              <div>
+                <div class="panel-header-action" style="margin-bottom: 16px;">
+                  <h3>Interactive Web Cursor Tester</h3>
+                  <span class="hint">Test mouse cursors live on this page</span>
+                </div>
+                <p style="color: #94a3b8; font-size: 0.9rem; line-height: 1.5; margin-bottom: 20px;">
+                  You can upload cursors directly into the Community Cursor Library. Standard <code>.cur</code> and <code>.ani</code> formats work seamlessly with Windows 10/11 desktop clients, and can also be tested live on this web page.
+                </p>
+                
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 20px;">
+                  <div style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 6px;">Active Web Pointer</div>
+                  <div id="lblActiveCursorName" style="font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 14px;">Default Windows Arrow</div>
+                  <button class="btn" onclick="resetWebCursor()" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 600;">
+                    Reset to Default Cursor
+                  </button>
+                </div>
+              </div>
+
+              <div style="background: rgba(127, 86, 217, 0.1); border: 1px solid rgba(127, 86, 217, 0.3); border-radius: 8px; padding: 12px 16px; color: #c4b5fd; font-size: 0.85rem; display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 1.2rem;">💡</span>
+                <span>Uploaded cursors are stored in Cloud Storage and synchronized across all desktop clients & the public website.</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Existing Cursors Management Gallery -->
+          <div class="glass-panel" style="margin-top: 24px; padding: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+              <div>
+                <h3 style="font-size: 1.2rem; margin-bottom: 4px;">Uploaded Cursors Library</h3>
+                <p style="color: #94a3b8; font-size: 0.85rem;">Manage, search, preview, and delete custom mouse cursor packs</p>
+              </div>
+
+              <div style="display: flex; gap: 10px; align-items: center;">
+                <input type="text" id="admin-cursor-search" onkeyup="filterAdminCursors()" placeholder="Search cursors..." style="background: rgba(255,255,255,0.05); color: #fff; border: 1px solid var(--border-panel); border-radius: 6px; padding: 8px 14px; font-family: inherit; font-size: 0.85rem; outline: none; width: 220px;">
+                <select id="admin-cursor-cat-filter" onchange="filterAdminCursors()" style="background: rgba(255,255,255,0.05); color: #fff; border: 1px solid var(--border-panel); border-radius: 6px; padding: 8px 12px; font-family: inherit; font-size: 0.85rem; outline: none; color-scheme: dark;">
+                  <option value="all">All Categories</option>
+                  <option value="Minimal">Minimal</option>
+                  <option value="Precision">Precision</option>
+                  <option value="Games">Games</option>
+                  <option value="Fantasy">Fantasy</option>
+                  <option value="Animated">Animated</option>
+                  <option value="Anime">Anime</option>
+                  <option value="Cyberpunk">Cyberpunk</option>
+                  <option value="Custom">Custom</option>
+                </select>
+              </div>
+            </div>
+
+            <div id="admin-cursors-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
+              <!-- Cursor cards rendered dynamically -->
+            </div>
+          </div>
+        </section>
+
       </div>
     </main>
 
@@ -729,6 +986,41 @@
         <button class="btn" id="btn-approve-appeal" style="background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.3); color: #4ade80; font-weight: 600; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 0.85rem;">
           ✓ Approve (Unban)
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gemini AI API Key Setup Modal -->
+  <div class="modal" id="gemini-key-modal" onclick="closeGeminiKeyModal()">
+    <div class="modal-content" onclick="event.stopPropagation()" style="max-width: 520px; padding: 28px; text-align: left; background: #0e0e18; border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 18px; box-shadow: 0 24px 70px rgba(0,0,0,0.8), 0 0 30px rgba(168, 85, 247, 0.15);">
+      <button class="modal-close" onclick="closeGeminiKeyModal()">&times;</button>
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+        <div style="width: 42px; height: 42px; border-radius: 12px; background: linear-gradient(135deg, #7F56D9, #D444F1); display: flex; align-items: center; justify-content: center; font-size: 1.3rem;">✨</div>
+        <div>
+          <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.3rem; font-weight: 700; margin: 0; color: #fff;">Google Gemini AI Setup</h3>
+          <p style="font-size: 0.8rem; color: #a1a1aa; margin: 2px 0 0 0;">Automatic visual recognition for bulk wallpapers</p>
+        </div>
+      </div>
+      
+      <p style="font-size: 0.88rem; color: #d4d4d8; line-height: 1.5; margin: 16px 0;">
+        Gemini Vision AI analyzes your images and video thumbnails to automatically generate aesthetic titles, detect categories, generate search tags, and write engaging descriptions.
+      </p>
+
+      <div style="margin-bottom: 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <label for="modal-gemini-key" style="font-size: 0.78rem; font-weight: 600; color: #e4e4e7; text-transform: uppercase; letter-spacing: 0.5px;">Gemini API Key</label>
+          <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style="font-size: 0.78rem; color: #c084fc; text-decoration: underline;">Get free API key ↗</a>
+        </div>
+        <div style="position: relative;">
+          <input type="password" id="modal-gemini-key" placeholder="AIzaSy..." style="width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); padding: 12px 42px 12px 14px; border-radius: 10px; color: #fff; font-size: 0.95rem; outline: none; font-family: monospace;">
+          <button type="button" onclick="toggleModalKeyVisibility()" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #a1a1aa; cursor: pointer; padding: 4px; font-size: 0.9rem;">👁️</button>
+        </div>
+        <span style="font-size: 0.75rem; color: #71717a; margin-top: 6px; display: block;">Keys are stored locally in your browser and used securely.</span>
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end;">
+        <button class="btn btn-secondary" onclick="closeGeminiKeyModal()">Cancel</button>
+        <button class="btn btn-ai" onclick="saveGeminiKeyModal()">💾 Save & Continue</button>
       </div>
     </div>
   </div>

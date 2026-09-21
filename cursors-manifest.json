@@ -1,0 +1,157 @@
+{
+  "cursors": [
+    {
+      "id": "edg-normal",
+      "name": "Edg - Normal Arrow",
+      "file": "https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Normal.cur",
+      "type": "cur",
+      "cat": "Minimal",
+      "creator": "Edg Cursor Set",
+      "desc": "Normal arrow cursor from Edg."
+    },
+    {
+      "id": "edg-busy",
+      "name": "Edg - Busy Loader",
+      "file": "https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Busy.cur",
+      "type": "cur",
+      "cat": "Minimal",
+      "creator": "Edg Cursor Set",
+      "desc": "Busy/loading cursor from Edg."
+    },
+    {
+      "id": "edg-hover",
+      "name": "Edg - Hover Hand",
+      "file": "https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Hover.cur",
+      "type": "cur",
+      "cat": "Minimal",
+      "creator": "Edg Cursor Set",
+      "desc": "Hover hand cursor from Edg."
+    },
+    {
+      "id": "edg-text",
+      "name": "Edg - Text Cursor",
+      "file": "https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Text.cur",
+      "type": "cur",
+      "cat": "Minimal",
+      "creator": "Edg Cursor Set",
+      "desc": "Text/caret cursor from Edg."
+    },
+    {
+      "id": "edg-move",
+      "name": "Edg - Move Cursor",
+      "file": "https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Move.cur",
+      "type": "cur",
+      "cat": "Minimal",
+      "creator": "Edg Cursor Set",
+      "desc": "Move crosshair cursor from Edg."
+    },
+    {
+      "id": "edg-help",
+      "name": "Edg - Help Pointer",
+      "file": "https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Help.cur",
+      "type": "cur",
+      "cat": "Minimal",
+      "creator": "Edg Cursor Set",
+      "desc": "Help/question cursor from Edg."
+    },
+    {
+      "id": "edg-no",
+      "name": "Edg - Not Allowed",
+      "file": "https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20NO.cur",
+      "type": "cur",
+      "cat": "Minimal",
+      "creator": "Edg Cursor Set",
+      "desc": "Not-allowed cursor from Edg."
+    },
+    {
+      "id": "edg-pencil",
+      "name": "Edg - Pencil Draw",
+      "file": "https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Pencil.cur",
+      "type": "cur",
+      "cat": "Minimal",
+      "creator": "Edg Cursor Set",
+      "desc": "Pencil/draw cursor from Edg."
+    },
+    {
+      "id": "edg-perci",
+      "name": "Edg - Perci Variant",
+      "file": "https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Perci.cur",
+      "type": "cur",
+      "cat": "Minimal",
+      "creator": "Edg Cursor Set",
+      "desc": "Alt pencil variant cursor from Edg."
+    },
+    {
+      "id": "edg-person",
+      "name": "Edg - Person Select",
+      "file": "https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Person.cur",
+      "type": "cur",
+      "cat": "Minimal",
+      "creator": "Edg Cursor Set",
+      "desc": "Person select cursor from Edg."
+    },
+    {
+      "id": "edg-location",
+      "name": "Edg - Location Pin",
+      "file": "https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Location.cur",
+      "type": "cur",
+      "cat": "Minimal",
+      "creator": "Edg Cursor Set",
+      "desc": "Location/map pin cursor from Edg."
+    },
+    {
+      "id": "edg-resize-h",
+      "name": "Edg - Horizontal Resize",
+      "file": "https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Set%20horiz%20resize.cur",
+      "type": "cur",
+      "cat": "Precision",
+      "creator": "Edg Cursor Set",
+      "desc": "Horizontal resize cursor from Edg."
+    },
+    {
+      "id": "edg-resize-v",
+      "name": "Edg - Vertical Resize",
+      "file": "https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Verticle%20Resize.cur",
+      "type": "cur",
+      "cat": "Precision",
+      "creator": "Edg Cursor Set",
+      "desc": "Vertical resize cursor from Edg."
+    },
+    {
+      "id": "edg-resize-d1",
+      "name": "Edg - Diagonal Resize NW",
+      "file": "https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Dia%20Resize%201.cur",
+      "type": "cur",
+      "cat": "Precision",
+      "creator": "Edg Cursor Set",
+      "desc": "Diagonal NW-SE resize cursor from Edg."
+    },
+    {
+      "id": "edg-resize-d2",
+      "name": "Edg - Diagonal Resize NE",
+      "file": "https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Dia%20resize%202.cur",
+      "type": "cur",
+      "cat": "Precision",
+      "creator": "Edg Cursor Set",
+      "desc": "Diagonal NE-SW resize cursor from Edg."
+    },
+    {
+      "id": "edg-workbg",
+      "name": "Edg - Background Work",
+      "file": "https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Work%20In%20the%20Backround.cur",
+      "type": "cur",
+      "cat": "Minimal",
+      "creator": "Edg Cursor Set",
+      "desc": "Background working cursor from Edg."
+    },
+    {
+      "id": "edg-alt",
+      "name": "Edg - Alt Arrow",
+      "file": "https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20cursor%20set%20alt.cur",
+      "type": "cur",
+      "cat": "Minimal",
+      "creator": "Edg Cursor Set",
+      "desc": "Alt arrow cursor from Edg."
+    }
+  ]
+}

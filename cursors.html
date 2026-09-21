@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Custom Cursors — Basic Wallpaper</title>
+  <meta name="description" content="Browse and download custom Windows mouse cursors (.cur, .ani) for Windows 10 and 11." />
+  <meta name="robots" content="index, follow" />
+  
+  <link rel="icon" type="image/png" href="assets/logo.png" />
+  <link rel="stylesheet" href="web-style.css?v=1.1" />
+  <link rel="stylesheet" href="hero-banner.css?v=1.1" />
+  <style>
+    .cursor-preview-box {
+      width: 100%;
+      height: 180px;
+      background: radial-gradient(circle at center, rgba(139, 92, 246, 0.15), rgba(10, 8, 20, 0.8));
+      border-top-left-radius: 12px;
+      border-top-right-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 4rem;
+      position: relative;
+      overflow: hidden;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      transition: transform 0.3s ease;
+    }
+    .wallpaper-card:hover .cursor-preview-box {
+      transform: scale(1.03);
+    }
+    .badge-category {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.15);
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: #fff;
+    }
+    .badge-likes {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.15);
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #ec4899;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .card-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .btn-card-action {
+      flex: 1;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+      transition: all 0.2s;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.04);
+      color: #fff;
+    }
+    .btn-card-action:hover {
+      background: rgba(255,255,255,0.1);
+      border-color: rgba(255,255,255,0.3);
+    }
+    .btn-card-action.primary {
+      background: linear-gradient(135deg, var(--accent), #4f46e5);
+      border: none;
+    }
+    .btn-card-action.primary:hover {
+      box-shadow: 0 4px 15px rgba(0, 194, 255, 0.3);
+    }
+    /* Like button — matches library.html style */
+    .gallery-like-btn {
+      transition: all 0.25s ease;
+    }
+    .gallery-like-btn:hover {
+      background: rgba(255, 85, 119, 0.15) !important;
+      border-color: rgba(255, 85, 119, 0.4) !important;
+      transform: scale(1.05);
+    }
+    .gallery-like-btn.liked .heart-icon {
+      color: #ff5577 !important;
+    }
+    .hover-hint-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #f1f5f9;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      pointer-events: none;
+    }
+    .cursor-preview-box:hover .hover-hint-chip {
+      background: rgba(139, 92, 246, 0.25);
+      border-color: rgba(168, 85, 247, 0.6);
+      color: #ffffff;
+      transform: scale(1.06);
+      box-shadow: 0 0 24px rgba(139, 92, 246, 0.6);
+    }
+  </style>
+</head>
+<body>
+
+<!-- GLOBAL BACKGROUND MESH -->
+<div class="global-mesh"></div>
+<div class="global-glow glow-1"></div>
+<div class="global-glow glow-2"></div>
+
+<!-- NAVBAR -->
+<header id="navbar" class="scrolled">
+  <div class="container">
+    <nav class="nav-inner">
+      <a href="index.html" class="nav-logo">
+        <img src="assets/logo.png" alt="Basic Wallpaper Logo" style="width: 34px; height: 34px; object-fit: contain;" />
+        <span>Basic Wallpaper</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="index.html#features">Features</a></li>
+        <li><a href="library.html">Wallpaper Library</a></li>
+        <li><a href="cursors.html" class="active" style="color: var(--accent); font-weight: 700;">Custom Cursors</a></li>
+        <li><a href="index.html#showcase">Showcase</a></li>
+        <li><a href="index.html#how-it-works">How It Works</a></li>
+        <li><a href="index.html#tutorials">Tutorials</a></li>
+        <li><a href="index.html#blog">Blog</a></li>
+        <li><a href="requirements.html">Requirements</a></li>
+      </ul>
+      <div class="nav-cta" style="display: flex; align-items: center; gap: 24px;">
+        <a href="https://pub-ea550d73efa44ce9a10a6fa1948cf626.r2.dev/BasicWallpaper-win-Setup.exe" class="nav-btn-dl" id="nav-download-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle; margin-right:6px;"><path d="M0 3.449L9.75 2.1V11.7H0V3.449zm0 9.15h9.75V22.25L0 20.925V12.599zm10.75-10.875L24 0v11.7h-13.25V1.724zM24 12.599V24l-13.25-1.875V12.6h13.25v-.001z"/></svg>
+          Download for Windows
+        </a>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section id="explore" style="padding: 140px 0 100px; min-height: 85vh;">
+    <div class="container text-center">
+      <div style="text-align: left; margin-bottom: 20px;" class="reveal visible">
+        <a href="index.html" class="btn-back">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          <span>Back to Home</span>
+        </a>
+      </div>
+
+      <div class="section-header reveal visible" style="margin-bottom: 40px;">
+        <div class="section-tag">Library</div>
+        <h1 class="hero-title" style="font-size: clamp(2.5rem, 6vw, 4rem);">Cursor <span class="gradient-text">Library</span></h1>
+        <p class="section-sub" style="margin-top:20px; max-width:600px; margin-left:auto; margin-right:auto;">
+          Browse and download community-submitted static and animated Windows mouse cursor packs in real-time.
+        </p>
+      </div>
+
+      <!-- Live Web Cursor Tester Bar -->
+      <div style="margin-bottom: 40px; display: inline-flex; align-items: center; gap: 16px; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); padding: 10px 24px; border-radius: 30px;" class="reveal visible">
+        <span style="font-size: 0.9rem; color: var(--text-secondary);">✨ Active Web Cursor: <strong id="lblActiveCursorName" style="color: #fff;">Default Windows Arrow</strong></span>
+        <button onclick="resetWebCursor()" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 6px 14px; border-radius: 16px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s;">Reset Cursor</button>
+      </div>
+
+      <!-- Controls Bar (Identical to library.html) -->
+      <div class="gallery-controls-bar reveal visible" style="margin-bottom: 50px;">
+        <div class="search-input-wrapper">
+          <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: rgba(255,255,255,0.4);"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="cursor-search" placeholder="Search cursors by title, creator, tags..." oninput="filterCursors()">
+        </div>
+
+        <div class="format-pill-selector">
+          <button class="pill-btn active" data-type="all" onclick="setFilter('all', this)">All Cursors</button>
+          <button class="pill-btn" data-type="cur" onclick="setFilter('cur', this)">Static .CUR</button>
+          <button class="pill-btn" data-type="ani" onclick="setFilter('ani', this)">Animated .ANI</button>
+        </div>
+
+        <select id="cursor-category-filter" onchange="filterCursors()" style="color-scheme: dark; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); padding: 8px 16px; border-radius: 20px; color: #fff; outline: none; cursor: pointer; font-family: 'Inter', sans-serif; font-size: 0.85rem; height: 38px;">
+          <option value="all">All Categories</option>
+          <option value="Minimal">Minimal &amp; Glass</option>
+          <option value="Neon">Neon &amp; Cyber</option>
+          <option value="Games">Gaming &amp; FPS</option>
+          <option value="Fantasy">Fantasy &amp; RPG</option>
+          <option value="Animated">Animated</option>
+          <option value="Precision">Precision</option>
+          <option value="Tools">Tools &amp; Craft</option>
+        </select>
+      </div>
+
+      <!-- Cards Grid -->
+      <div class="gallery-grid" id="cursor-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px;"></div>
+
+      <!-- Pagination -->
+      <div id="cursor-pagination" style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 48px; padding-bottom: 20px;"></div>
+
+    </div>
+  </section>
+</main>
+
+<!-- Supabase & Firebase SDKs -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+<script src="firebase-config.js?v=2"></script>
+<script>
+  /* ─── Supabase client (same creds as main.js) ─── */
+  const SUPA_URL = 'https://msgncyczxaldboqqyjhw.supabase.co';
+  const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1zZ25jeWN6eGFsZGJvcXF5amh3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc3NDI2ODksImV4cCI6MjA5MzMxODY4OX0.xccy6mitXQJ5eckmcOTxRn6O5iy1Mlbd-wY5lxOzPHI';
+  let supa = null;
+  if (typeof window !== 'undefined' && window.supabaseClient) {
+    supa = window.supabaseClient;
+  } else if (typeof supabase !== 'undefined') {
+    supa = supabase.createClient(SUPA_URL, SUPA_KEY);
+  }
+
+  const R2 = 'https://pub-b384747b927e4685854bac292eb2157e.r2.dev';
+
+  /* ─── Cursor catalogue — no duplicates ─── */
+  const ALL_CURSORS = [
+    /* UNIQUE IMAGES */
+    { id:'cursor-arrow01',  file:'arrow01.cur',   type:'cur', cat:'Minimal',  name:'Classic Arrow 01',      creator:'Cronous Online', desc:'Sleek angled arrow pointer.',           svg:'<path d="M4.5 3.5L11.5 20.5L14.2 13.8L20.5 11.5L4.5 3.5Z"/>', svgFill:'#A855F7', svgStroke:'#FFF', svgSW:'1.5' },
+    { id:'cursor-arrow02',  file:'arrow02.cur',   type:'cur', cat:'Precision', name:'Precision Arrow 02',    creator:'Cronous Online', desc:'High-accuracy precision arrow pointer.',  svg:'<circle cx="12" cy="12" r="7"/><line x1="12" y1="2" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="22"/><line x1="2" y1="12" x2="7" y2="12"/><line x1="17" y1="12" x2="22" y2="12"/>', svgFill:'none', svgStroke:'#60A5FA', svgSW:'2' },
+    { id:'cursor-attack01', file:'attack01.cur',  type:'cur', cat:'Games',    name:'Combat Attack Pointer',  creator:'Cronous Online', desc:'Tactical gaming combat attack cursor.',  svg:'<path d="M14.5 17.5L3 6V3H6L17.5 14.5M13 19L19 13M19 19L21 21M17 17L15 15"/>', svgFill:'none', svgStroke:'#F43F5E', svgSW:'2' },
+    { id:'cursor-enchant01',file:'enchant01.cur', type:'cur', cat:'Fantasy',  name:'Enchanted Magic Wand',   creator:'Cronous Online', desc:'Mystical enchanted wand cursor.',        svg:'<path d="M15 4l5 5L7 21H2v-5L15 4z"/>', svgFill:'none', svgStroke:'#EC4899', svgSW:'2' },
+    { id:'cursor-finger01a',file:'finger01.ani',  type:'ani', cat:'Animated', name:'Animated Hand Pointer',  creator:'Cronous Online', desc:'Animated pointing hand cursor.',         svg:'<path d="M10 2v10.5a1.5 1.5 0 01-3 0V7a1.5 1.5 0 00-3 0v8.5a7.5 7.5 0 0015 0V11a1.5 1.5 0 00-3 0v.5a1.5 1.5 0 00-3 0v-.5a1.5 1.5 0 00-3 0V2a1.5 1.5 0 00-3 0z"/>', svgFill:'#FBBF24', svgStroke:'#D97706', svgSW:'1.5' },
+    { id:'cursor-finger01c',file:'finger01.cur',  type:'cur', cat:'Minimal',  name:'Hand Pointing Cursor',   creator:'Cronous Online', desc:'Classic static pointing hand cursor.',   svg:'<path d="M9 2v10a1.5 1.5 0 01-3 0V7.5a1.5 1.5 0 00-3 0v8a7.5 7.5 0 0015 0V10a1.5 1.5 0 00-3 0v.5a1.5 1.5 0 00-3 0V2a1.5 1.5 0 00-3 0z"/>', svgFill:'#FFFFFF', svgStroke:'#3B82F6', svgSW:'1.5' },
+    { id:'cursor-finger02', file:'finger02.cur',  type:'cur', cat:'Minimal',  name:'Link Finger Pointer',    creator:'Cronous Online', desc:'Precision link select hand pointer.',    svg:'<path d="M10 3v9M7 6v6M13 6v6M16 9v3M4 11v4a6 6 0 0012 0v-4"/>', svgFill:'none', svgStroke:'#10B981', svgSW:'2' },
+    { id:'cursor-key',      file:'key.ani',       type:'ani', cat:'Animated', name:'Animated Golden Key',    creator:'Cronous Online', desc:'Spinning golden key animated cursor.',   svg:'<circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3L19.5 3.5M16 7l2 2M18.5 4.5l2 2"/>', svgFill:'none', svgStroke:'#F59E0B', svgSW:'2' },
+    { id:'cursor-potion01', file:'potion01.cur',  type:'cur', cat:'Fantasy',  name:'Magic Health Potion',    creator:'Cronous Online', desc:'RPG health potion magic cursor.',        svg:'<path d="M9 3h6M10 3v3l-4 7a4 4 0 003.5 6h5a4 4 0 003.5-6l-4-7V3"/>', svgFill:'none', svgStroke:'#10B981', svgSW:'2' },
+    { id:'cursor-repair01', file:'repair01.cur',  type:'cur', cat:'Tools',    name:'Hammer Repair Tool',     creator:'Cronous Online', desc:'Crafting and repair hammer cursor.',     svg:'<path d="M15 4l5 5M12 7l5 5M14 9l-9 9a2.1 2.1 0 01-3-3l9-9"/>', svgFill:'none', svgStroke:'#94A3B8', svgSW:'2' },
+    { id:'cursor-trade01',  file:'trade01.cur',   type:'cur', cat:'Games',    name:'Gold Merchant Trade',    creator:'Cronous Online', desc:'Merchant gold trade cursor pointer.',    svg:'<circle cx="12" cy="12" r="9"/><path d="M12 7v10M15 9.5a2.5 2.5 0 00-5 0c0 3 5 2 5 5a2.5 2.5 0 01-5 0"/>', svgFill:'none', svgStroke:'#EAB308', svgSW:'2' },
+
+    /* === EDG CURSOR SET - R2 pre-encoded URLs === */
+    { id:'edg-normal',   file:'https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Normal.cur',          type:'cur', cat:'Minimal',   name:'Edg - Normal Arrow',        creator:'Edg Cursor Set', desc:'Sleek custom arrow cursor from Edg.',               svg:'<path d="M4.5 3.5L11.5 20.5L14.2 13.8L20.5 11.5L4.5 3.5Z"/>',                          svgFill:'#6366F1', svgStroke:'#FFF', svgSW:'1.5' },
+    { id:'edg-busy',     file:'https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Busy.cur',            type:'cur', cat:'Minimal',   name:'Edg - Busy Loader',         creator:'Edg Cursor Set', desc:'Busy/loading state cursor from Edg.',               svg:'<path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4"/>',  svgFill:'none', svgStroke:'#6366F1', svgSW:'2' },
+    { id:'edg-hover',    file:'https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Hover.cur',           type:'cur', cat:'Minimal',   name:'Edg - Hover Hand',          creator:'Edg Cursor Set', desc:'Link hover/click pointer from Edg.',                svg:'<path d="M9 2v10M6 5v7M12 5v7M15 8v4M4 12v4a6 6 0 0012 0v-4"/>',                        svgFill:'none', svgStroke:'#6366F1', svgSW:'2' },
+    { id:'edg-text',     file:'https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Text.cur',            type:'cur', cat:'Minimal',   name:'Edg - Text Cursor',         creator:'Edg Cursor Set', desc:'Text selection/caret cursor from Edg.',             svg:'<path d="M4 7h3M17 7h3M12 4v16M4 17h3M17 17h3"/>',                                       svgFill:'none', svgStroke:'#6366F1', svgSW:'2' },
+    { id:'edg-move',     file:'https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Move.cur',            type:'cur', cat:'Minimal',   name:'Edg - Move Cursor',         creator:'Edg Cursor Set', desc:'Drag/move crosshair cursor from Edg.',              svg:'<path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M12 12h.01"/>',          svgFill:'none', svgStroke:'#6366F1', svgSW:'2' },
+    { id:'edg-help',     file:'https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Help.cur',            type:'cur', cat:'Minimal',   name:'Edg - Help Pointer',        creator:'Edg Cursor Set', desc:'Help question-mark cursor from Edg.',               svg:'<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/>',         svgFill:'none', svgStroke:'#6366F1', svgSW:'2' },
+    { id:'edg-no',       file:'https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20NO.cur',              type:'cur', cat:'Minimal',   name:'Edg - Not Allowed',         creator:'Edg Cursor Set', desc:'Blocked/not-allowed cursor from Edg.',              svg:'<circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>',     svgFill:'none', svgStroke:'#F43F5E', svgSW:'2' },
+    { id:'edg-pencil',   file:'https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Pencil.cur',          type:'cur', cat:'Minimal',   name:'Edg - Pencil Draw',         creator:'Edg Cursor Set', desc:'Drawing/pencil cursor from Edg.',                   svg:'<path d="M15.5 4l4.5 4.5L7 21H3v-4L15.5 4z"/>',                                         svgFill:'none', svgStroke:'#6366F1', svgSW:'2' },
+    { id:'edg-perci',    file:'https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Perci.cur',           type:'cur', cat:'Minimal',   name:'Edg - Perci Variant',       creator:'Edg Cursor Set', desc:'Alt pencil variant cursor from Edg.',               svg:'<path d="M17 3l4 4-14 14H3v-4L17 3z"/>',                                                  svgFill:'none', svgStroke:'#8B5CF6', svgSW:'2' },
+    { id:'edg-person',   file:'https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Person.cur',          type:'cur', cat:'Minimal',   name:'Edg - Person Select',       creator:'Edg Cursor Set', desc:'Person/user select cursor from Edg.',               svg:'<circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>',                  svgFill:'none', svgStroke:'#6366F1', svgSW:'2' },
+    { id:'edg-location', file:'https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Location.cur',        type:'cur', cat:'Minimal',   name:'Edg - Location Pin',        creator:'Edg Cursor Set', desc:'Map location pointer cursor from Edg.',             svg:'<path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1118 0z"/><circle cx="12" cy="10" r="3"/>',svgFill:'none', svgStroke:'#6366F1', svgSW:'2' },
+    { id:'edg-resize-h', file:'https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Set%20horiz%20resize.cur',  type:'cur', cat:'Precision', name:'Edg - Horizontal Resize',  creator:'Edg Cursor Set', desc:'Horizontal window resize cursor from Edg.',          svg:'<path d="M7 16l-4-4 4-4M17 8l4 4-4 4M3 12h18"/>',                                        svgFill:'none', svgStroke:'#60A5FA', svgSW:'2' },
+    { id:'edg-resize-v', file:'https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Verticle%20Resize.cur',     type:'cur', cat:'Precision', name:'Edg - Vertical Resize',    creator:'Edg Cursor Set', desc:'Vertical window resize cursor from Edg.',            svg:'<path d="M8 7l4-4 4 4M16 17l-4 4-4-4M12 3v18"/>',                                        svgFill:'none', svgStroke:'#60A5FA', svgSW:'2' },
+    { id:'edg-resize-d1',file:'https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Dia%20Resize%201.cur',      type:'cur', cat:'Precision', name:'Edg - Diagonal Resize NW',  creator:'Edg Cursor Set', desc:'Diagonal resize NW-SE cursor from Edg.',            svg:'<path d="M7 7l10 10M17 7v10H7"/>',                                                        svgFill:'none', svgStroke:'#60A5FA', svgSW:'2' },
+    { id:'edg-resize-d2',file:'https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Dia%20resize%202.cur',      type:'cur', cat:'Precision', name:'Edg - Diagonal Resize NE',  creator:'Edg Cursor Set', desc:'Diagonal resize NE-SW cursor from Edg.',            svg:'<path d="M17 7L7 17M7 7h10v10"/>',                                                        svgFill:'none', svgStroke:'#60A5FA', svgSW:'2' },
+    { id:'edg-workbg',   file:'https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20Cursor%20Work%20In%20the%20Backround.cur', type:'cur', cat:'Minimal',   name:'Edg - Background Work',    creator:'Edg Cursor Set', desc:'Background working spinner cursor from Edg.',        svg:'<path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4"/>',  svgFill:'none', svgStroke:'#6366F1', svgSW:'2' },
+    { id:'edg-alt',      file:'https://pub-b384747b927e4685854bac292eb2157e.r2.dev/Edg%27s%20Cursor%20Set%20Finished-Edg%27s%20cursor%20set%20alt.cur',         type:'cur', cat:'Minimal',   name:'Edg - Alt Arrow',           creator:'Edg Cursor Set', desc:'Alternate default cursor from Edg.',                svg:'<path d="M4.5 3.5L11.5 20.5L14.2 13.8L20.5 11.5L4.5 3.5Z"/>',                           svgFill:'#8B5CF6', svgStroke:'#FFF', svgSW:'1.5' },
+  ];
+
+  const PAGE_SIZE = 8;
+  let currentPage = 1;
+  let filteredCursors = [...ALL_CURSORS];
+  let activeFormat = 'all';
+
+  /* ─── Local like state (localStorage) ─── */
+  function getLikedCursors() {
+    try { return JSON.parse(localStorage.getItem('liked_cursors') || '[]'); } catch { return []; }
+  }
+  function setLikedCursors(arr) {
+    localStorage.setItem('liked_cursors', JSON.stringify(arr));
+  }
+
+  /* ─── Supabase cursor likes table ─── */
+  // Table: cursor_likes (id TEXT PK, likes INT DEFAULT 0)
+  let cursorLikeCounts = {}; // { cursorId: count }
+
+  async function fetchLikeCounts() {
+    if (supa) {
+      try {
+        // Fetch community-submitted cursors from community_cursors metadata table
+        const { data: dbCursors, error: dbErr } = await supa
+          .from('community_cursors')
+          .select('*');
+        
+        if (!dbErr && dbCursors && dbCursors.length > 0) {
+          dbCursors.forEach(c => {
+            if (!ALL_CURSORS.some(orig => orig.id === c.id || orig.file === c.file)) {
+              ALL_CURSORS.push({
+                id: c.id,
+                file: c.file_url || c.file,
+                type: c.type || (c.file.endsWith('.ani') ? 'ani' : 'cur'),
+                cat: c.category || 'General',
+                name: c.title || c.name,
+                creator: c.creator || 'Anonymous',
+                desc: c.description || 'Custom community cursor.',
+                svg: c.svg || '<path d="M4.5 3.5L11.5 20.5L14.2 13.8L20.5 11.5L4.5 3.5Z"/>',
+                svgFill: c.svg_fill || '#A855F7',
+                svgStroke: c.svg_stroke || '#FFF',
+                svgSW: c.svg_sw || '1.5'
+              });
+            }
+          });
+        }
+      } catch(err) {
+        console.warn('Failed to fetch community_cursors:', err);
+      }
+
+      try {
+        // Try multiple possible cursor storage bucket names (in case it was created with different name)
+        const BUCKET_NAMES = ['cursors', 'cursor', 'cursor-files', 'cursor_files', 'custom-cursors', 'Cursors'];
+        let files = null;
+        let usedBucket = null;
+
+        for (const bucketName of BUCKET_NAMES) {
+          const { data: listData, error: listErr } = await supa
+            .storage
+            .from(bucketName)
+            .list('', { limit: 200 });
+          
+          if (!listErr && listData && listData.length > 0) {
+            // Filter to only cursor/ani files
+            const cursorFiles = listData.filter(f => f.name.match(/\.(cur|ani)$/i));
+            if (cursorFiles.length > 0) {
+              files = cursorFiles;
+              usedBucket = bucketName;
+              console.log('Found', cursorFiles.length, 'cursor files in bucket:', bucketName);
+              break;
+            }
+          }
+        }
+
+        if (files && usedBucket) {
+          files.forEach(f => {
+            // Ignore system files
+            if (f.name === '.emptyFolderPlaceholder') return;
+
+            const cursorId = `storage-${f.name.replace(/[^a-zA-Z0-9]/g, '-')}`;
+            if (!ALL_CURSORS.some(orig => orig.file.includes(f.name) || orig.id === cursorId)) {
+              const cleanName = decodeURIComponent(f.name)
+                .replace(/\.(cur|ani)$/i, '')
+                .replace(/[_\-]/g, ' ')
+                .replace(/\b\w/g, c => c.toUpperCase());
+              
+              const isAni = f.name.toLowerCase().endsWith('.ani');
+              const fileUrl = `${SUPA_URL}/storage/v1/object/public/${usedBucket}/${encodeURIComponent(f.name)}`;
+
+              ALL_CURSORS.push({
+                id: cursorId,
+                file: fileUrl,
+                type: isAni ? 'ani' : 'cur',
+                cat: isAni ? 'Animated' : 'Minimal',
+                name: cleanName,
+                creator: 'Community Upload',
+                desc: `Community uploaded ${isAni ? 'animated' : 'static'} cursor.`,
+                svg: isAni
+                  ? '<path d="M10 2v10.5a1.5 1.5 0 01-3 0V7a1.5 1.5 0 00-3 0v8.5a7.5 7.5 0 0015 0V11a1.5 1.5 0 00-3 0v.5a1.5 1.5 0 00-3 0v-.5a1.5 1.5 0 00-3 0V2a1.5 1.5 0 00-3 0z"/>'
+                  : '<path d="M4.5 3.5L11.5 20.5L14.2 13.8L20.5 11.5L4.5 3.5Z"/>',
+                svgFill: isAni ? '#FBBF24' : '#8B5CF6',
+                svgStroke: '#FFF',
+                svgSW: '1.5'
+              });
+            }
+          });
+        } else {
+          console.warn('No cursor files found in any storage bucket. Please create a "cursors" bucket in Supabase Storage and upload .cur/.ani files there.');
+        }
+      } catch(storageErr) {
+        console.warn('Failed to list cursor storage files:', storageErr);
+      }
+
+      // Update active filtered reference array
+      filteredCursors = [...ALL_CURSORS];
+
+      try {
+        const ids = ALL_CURSORS.map(c => c.id);
+        const { data, error } = await supa.from('cursor_likes').select('id, likes').in('id', ids);
+        if (!error && data) {
+          data.forEach(row => { cursorLikeCounts[row.id] = row.likes || 0; });
+        }
+      } catch(e) { 
+        console.warn('cursor_likes fetch error', e); 
+      }
+    }
+    renderCurrentPage();
+  }
+
+  async function toggleCursorLike(cursorId, event) {
+    event.stopPropagation();
+    const liked = getLikedCursors();
+    const isLiked = liked.includes(cursorId);
+    const newLiked = isLiked ? liked.filter(x => x !== cursorId) : [...liked, cursorId];
+    setLikedCursors(newLiked);
+
+    // Optimistic UI update
+    const currentCount = cursorLikeCounts[cursorId] || 0;
+    const newCount = Math.max(0, currentCount + (isLiked ? -1 : 1));
+    cursorLikeCounts[cursorId] = newCount;
+    updateLikeButton(cursorId, !isLiked, newCount);
+
+    // Supabase upsert directly (simpler and safer without relying on RPC setup)
+    if (supa) {
+      try {
+        const { error } = await supa
+          .from('cursor_likes')
+          .upsert({ id: cursorId, likes: newCount }, { onConflict: 'id' });
+        if (error) throw error;
+      } catch(e) {
+        console.warn('Supabase like sync failed, trying RPC', e);
+        try {
+          await supa.rpc('toggle_cursor_like', { cursor_id: cursorId, is_like: !isLiked });
+        } catch(e2) {
+          console.error('All database like sync options failed:', e2);
+        }
+      }
+    }
+  }
+
+  function updateLikeButton(cursorId, isNowLiked, count) {
+    const btn = document.querySelector(`[data-like-id="${cursorId}"]`);
+    if (!btn) return;
+    btn.className = `gallery-like-btn ${isNowLiked ? 'liked' : ''}`;
+    const heart = btn.querySelector('.heart-icon');
+    if (heart) {
+      heart.style.color = isNowLiked ? '#ff5577' : 'rgba(255,255,255,0.6)';
+      heart.textContent = isNowLiked ? '♥' : '♡';
+    }
+    const countEl = btn.querySelector('.like-count');
+    if (countEl) countEl.textContent = count;
+  }
+
+  /* ─── Card builder (Exact UI matching library.html) ─── */
+  function buildCard(c) {
+    const liked = getLikedCursors();
+    const isLiked = liked.includes(c.id);
+    const count = cursorLikeCounts[c.id] ?? 0;
+
+    // Build raw URL then encode apostrophes so they're safe in CSS url('') and HTML onclick=''
+    const rawUrl = (c.file.startsWith('http://') || c.file.startsWith('https://')) ? c.file : `${R2}/${c.file}`;
+    // Replace literal apostrophes with %27 so they can't break CSS / HTML attribute strings
+    const fileUrl = rawUrl.replace(/'/g, '%27');
+    // Escape the cursor name for safe embedding in onclick single-quoted attributes
+    const safeName = c.name.replace(/'/g, '&#39;');
+
+    return `
+      <div class="wallpaper-card cursor-item" data-cat="${c.cat}" data-type="${c.type}" data-title="${c.name.toLowerCase()} ${c.id}">
+        <div class="cursor-preview-box" style="cursor:url('${fileUrl}'),auto; position:relative;" onclick="testWebCursor('${fileUrl}','${safeName}')">
+          <span class="badge-category">${c.cat}</span>
+
+          <!-- Real Like Button (same style as library.html) -->
+          <button class="gallery-like-btn ${isLiked ? 'liked' : ''}" data-like-id="${c.id}"
+            onclick="toggleCursorLike('${c.id}', event)"
+            style="position:absolute;top:12px;right:12px;z-index:10;display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:12px;background:rgba(13,13,15,0.75);border:1px solid rgba(255,255,255,0.08);color:#fff;cursor:pointer;transition:all 0.25s ease;font-size:0.8rem;font-family:'Inter',sans-serif;backdrop-filter:blur(8px);">
+            <span class="heart-icon" style="color:${isLiked ? '#ff5577' : 'rgba(255,255,255,0.6)'};font-size:0.95rem;transition:color 0.2s;">${isLiked ? '♥' : '♡'}</span>
+            <span class="like-count" style="font-weight:600;">${count}</span>
+          </button>
+
+          <div class="hover-hint-chip">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="${c.svgFill}" stroke="${c.svgStroke}" stroke-width="${c.svgSW}">${c.svg}</svg>
+            <span>Hover box to test cursor</span>
+          </div>
+        </div>
+        <div class="card-info" style="padding: 16px 20px; text-align: left; display: flex; flex-direction: column; gap: 8px;">
+          <h4 class="card-title" style="font-size: 1.15rem; font-weight: 700; color: #fff; margin-bottom: 2px; font-family: 'Outfit', sans-serif;">${c.name}</h4>
+          <span class="card-creator" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 4px;">By ${c.creator}</span>
+          <p style="font-size: 0.85rem; color: #94a3b8; line-height: 1.4; min-height: 40px; margin: 0;">${c.desc} (.${c.type})</p>
+          
+          <div class="gallery-card-footer" style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 14px; margin-top: 8px;">
+            <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500;">🖱️ Custom Pointer</span>
+            <div style="display: flex; gap: 8px; justify-content: flex-end;">
+              <button class="gallery-dl-btn" onclick="addToApp('${fileUrl}','${safeName}')" style="background: rgba(168,85,247,0.1); border-color: rgba(168,85,247,0.25); color: #c084fc; padding: 6px 14px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.2s;">Add to App</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  /* ─── Render All Cursors (Scrollable) ─── */
+  function renderCurrentPage() {
+    const grid = document.getElementById('cursor-grid');
+    grid.innerHTML = filteredCursors.map(buildCard).join('');
+    // Remove pagination bar content completely
+    const pag = document.getElementById('cursor-pagination');
+    if (pag) pag.innerHTML = '';
+  }
+
+
+
+
+  /* ─── Filter ─── */
+  function setFilter(type, btn) {
+    activeFormat = type;
+    document.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    filterCursors();
+  }
+  window.setFilter = setFilter;
+
+  function filterCursors() {
+    const q = (document.getElementById('cursor-search').value || '').toLowerCase();
+    const cat = document.getElementById('cursor-category-filter').value;
+    filteredCursors = ALL_CURSORS.filter(c => {
+      const matchQ = !q || c.name.toLowerCase().includes(q) || c.cat.toLowerCase().includes(q);
+      const matchCat = cat === 'all' || c.cat === cat;
+      const matchType = activeFormat === 'all' || c.type === activeFormat;
+      return matchQ && matchCat && matchType;
+    });
+    currentPage = 1;
+    renderCurrentPage();
+  }
+  window.filterCursors = filterCursors;
+
+  /* ─── Cursor test bar ─── */
+  function testWebCursor(url, name) {
+    document.getElementById('lblActiveCursorName').innerText = name;
+    document.body.style.cursor = `url('${url}'), auto`;
+  }
+  window.testWebCursor = testWebCursor;
+
+  function resetWebCursor() {
+    document.getElementById('lblActiveCursorName').innerText = 'Default Windows Arrow';
+    document.body.style.cursor = 'default';
+  }
+  window.resetWebCursor = resetWebCursor;
+
+  /* ─── Add to App deep-link ─── */
+  function addToApp(url, name) {
+    const deepLink = `basicwallpaper://import-cursor?url=${encodeURIComponent(url)}&name=${encodeURIComponent(name)}`;
+    window.location.href = deepLink;
+  }
+  window.addToApp = addToApp;
+
+  /* ─── Init ─── */
+  window.addEventListener('DOMContentLoaded', () => {
+    fetchLikeCounts();
+  });
+</script>
+
+</body>
+</html>
+
