@@ -357,6 +357,7 @@ async function initClients() {
       if (error) throw error;
       updateStatusBadge('supabase', 'online');
       updateAppealsBadge();
+      fetchPendingApprovals();
     } catch (e) {
       console.warn('Supabase Client fail:', e.message);
       updateStatusBadge('supabase', 'offline');
@@ -460,6 +461,10 @@ function switchTab(tabId) {
     title.innerText = 'Community Wallpaper Gallery';
     sub.innerText = 'Manage, preview, search, and delete wallpapers in the community database';
     fetchCommunityWallpapers();
+  } else if (tabId === 'approvals') {
+    title.innerText = 'Wallpaper Approvals';
+    sub.innerText = 'Review, approve, or reject user-submitted wallpapers before they appear live in community';
+    fetchPendingApprovals();
   } else if (tabId === 'strikes') {
     title.innerText = 'Strikes & Bans';
     sub.innerText = 'Issue copyright strikes, manage blocked creators, and view strike history';
@@ -555,6 +560,14 @@ function setupDragAndDrop() {
   if (folderInput) {
     folderInput.addEventListener('change', () => {
       handleUploadedFiles(folderInput.files);
+    });
+  }
+
+  // Handle mobile folder picker selection (9:16 ratio videos only)
+  const mobileFolderInput = document.getElementById('mobile-folder-input');
+  if (mobileFolderInput) {
+    mobileFolderInput.addEventListener('change', () => {
+      handleUploadedFiles(mobileFolderInput.files, { isMobileFolder: true });
     });
   }
 }
@@ -985,8 +998,82 @@ async function generateAIMetadataForAll() {
   }
 }
 
-// Process Uploaded Files to Queue list
-function handleUploadedFiles(files) {
+// Helper: check video/media aspect ratio dimensions
+function checkMediaDimensions(file) {
+  return new Promise((resolve) => {
+    const isVideo = file.type.startsWith('video/');
+    if (!isVideo) {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const w = img.naturalWidth || 0;
+        const h = img.naturalHeight || 0;
+        URL.revokeObjectURL(url);
+        resolve({ width: w, height: h, isPortrait: h >= w });
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(null);
+      };
+      img.src = url;
+      return;
+    }
+
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.muted = true;
+    const url = URL.createObjectURL(file);
+    video.src = url;
+    video.onloadedmetadata = () => {
+      const w = video.videoWidth || 0;
+      const h = video.videoHeight || 0;
+      URL.revokeObjectURL(url);
+      video.remove();
+      resolve({ width: w, height: h, isPortrait: h >= w });
+    };
+    video.onerror = () => {
+      URL.revokeObjectURL(url);
+      video.remove();
+      resolve(null);
+    };
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+      video.remove();
+      resolve(null);
+    }, 4500);
+  });
+}
+
+// Helper: Append standard mobile tags
+function appendMobileTags(existingTags = '') {
+  let list = (existingTags || '').split(',').map(t => t.trim()).filter(Boolean);
+  const required = ['target:mobile', 'device:mobile', 'ratio:9:16', 'mobile'];
+  required.forEach(req => {
+    if (!list.some(t => t.toLowerCase() === req.toLowerCase())) {
+      list.push(req);
+    }
+  });
+  return list.join(', ');
+}
+
+// Helper: Remove mobile tags for PC software
+function removeMobileTags(existingTags = '') {
+  let list = (existingTags || '').split(',').map(t => t.trim()).filter(Boolean);
+  return list.filter(t => !/^(target:mobile|device:mobile|ratio:9:16|mobile_only|mobile)$/i.test(t)).join(', ');
+}
+
+// Helper: Check if wallpaper is mobile
+function isMobileWallpaper(wp) {
+  const tags = (wp.tags || '').toLowerCase();
+  return tags.includes('target:mobile') || 
+         tags.includes('device:mobile') || 
+         tags.includes('ratio:9:16') || 
+         tags.includes('mobile_only') || 
+         (wp.category && wp.category.toLowerCase() === 'mobile');
+}
+
+// Process Uploaded Files to Queue list (supports Mobile Folder Upload)
+async function handleUploadedFiles(files, options = {}) {
   if (isUploading) {
     showToast('Cannot add files while uploads are in progress!', 'danger');
     return;
@@ -995,23 +1082,62 @@ function handleUploadedFiles(files) {
   const filesArray = Array.from(files);
   const autoAIToggle = document.getElementById('auto-ai-toggle');
   const shouldAutoAI = autoAIToggle ? autoAIToggle.checked : true;
+  const bulkPlatform = document.getElementById('bulk-platform') ? document.getElementById('bulk-platform').value : '';
+  const isMobileFolderMode = !!options.isMobileFolder;
   
-  filesArray.forEach(file => {
+  let rejectedCount = 0;
+  let addedCount = 0;
+
+  for (const file of filesArray) {
     const isVideo = file.type.startsWith('video/');
     const isImage = file.type.startsWith('image/');
     
     if (!isVideo && !isImage) {
       showToast(`Unsupported file format: ${file.name}`, 'warning');
-      return;
+      continue;
     }
 
     if (isVideo && file.size > 150 * 1024 * 1024) {
       showToast(`Video size exceeds 150MB limit: ${file.name} (${formatBytes(file.size)})`, 'danger');
-      return;
+      continue;
+    }
+
+    // Dimension check
+    const dims = await checkMediaDimensions(file);
+
+    // MOBILE FOLDER UPLOAD REQUIREMENT: Only vertical (9:16 portrait) videos accepted!
+    if (isMobileFolderMode) {
+      if (!isVideo) {
+        showToast(`Skipped non-video file in Mobile Upload: ${file.name}`, 'warning');
+        rejectedCount++;
+        continue;
+      }
+      // If width > height, this is a landscape (PC) video!
+      if (dims && dims.width > dims.height) {
+        rejectedCount++;
+        showToast(`⚠️ Skipped "${file.name}" (${dims.width}x${dims.height}): Landscape video! Mobile folder only accepts 9:16 portrait videos.`, 'warning');
+        continue;
+      }
+    }
+
+    // Determine if this item is marked for Mobile Software
+    let isMobile = false;
+    if (isMobileFolderMode) {
+      isMobile = true;
+    } else if (bulkPlatform === 'mobile') {
+      isMobile = true;
+    } else if (bulkPlatform === 'pc') {
+      isMobile = false;
+    } else if (dims && dims.height > dims.width) {
+      // Auto-detected portrait video
+      isMobile = true;
     }
     
     const title = formatTitleFromName(file.name);
-    const tags = document.getElementById('bulk-tags').value.trim();
+    let tags = document.getElementById('bulk-tags').value.trim();
+    if (isMobile) {
+      tags = appendMobileTags(tags);
+    }
     const desc = document.getElementById('bulk-desc').value.trim();
     const bulkCat = document.getElementById('bulk-category').value || 'General';
     const category = (bulkCat === 'General') ? autoCategorize(title, tags, desc) : bulkCat;
@@ -1022,6 +1148,8 @@ function handleUploadedFiles(files) {
       name: file.name,
       size: file.size,
       type: isVideo ? 'video' : 'image',
+      isMobile: isMobile,
+      dimensions: dims ? `${dims.width}x${dims.height}` : '',
       title: title,
       creator: document.getElementById('bulk-creator').value.trim() || 'Pavan Am',
       category: category,
@@ -1038,6 +1166,7 @@ function handleUploadedFiles(files) {
     
     uploadQueue.push(item);
     renderQueueCard(item);
+    addedCount++;
     
     // Generate thumbnail asynchronously
     item.thumbnailReady = generateThumbnail(item);
@@ -1048,7 +1177,16 @@ function handleUploadedFiles(files) {
         generateAIMetadataForItem(item.id, true);
       });
     }
-  });
+  }
+
+  if (isMobileFolderMode) {
+    if (addedCount > 0) {
+      showToast(`📱 Added ${addedCount} Mobile (9:16) video(s) to queue.`, 'success');
+    }
+    if (rejectedCount > 0) {
+      showToast(`⚠️ Filtered out ${rejectedCount} invalid/landscape file(s) from Mobile Upload.`, 'info');
+    }
+  }
   
   updateQueueUI();
 }
@@ -1100,19 +1238,28 @@ function renderQueueCard(item) {
   
   card.innerHTML = `
     <!-- Left Column: Media Preview & Thumb Config -->
-    <div class="queue-media-preview">
+    <div class="queue-media-preview ${item.isMobile ? 'mobile-ratio' : ''}">
       <div class="preview-container">
         <img id="img-preview-${item.id}" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23111116'/%3E%3C/svg%3E" alt="Preview">
         <span class="video-badge">${item.type}</span>
+        <span id="badge-platform-${item.id}" class="${item.isMobile ? 'mobile-card-badge' : 'pc-card-badge'}" style="position: absolute; bottom: 8px; left: 8px; z-index: 2;">
+          ${item.isMobile ? '📱 9:16 Mobile' : '🖥️ PC 16:9'}
+        </span>
       </div>
       
       ${isVideo ? `
       <div class="thumbnail-capture-control">
         <div class="slider-row">
           <label>Capture Frame</label>
-          <span id="time-display-${item.id}">1.0s</span>
+          <span id="time-display-${item.id}">1.00s</span>
         </div>
-        <input type="range" class="capture-slider" id="slider-${item.id}" min="0" max="10" step="0.1" value="1.0" oninput="updateItemCaptureTime('${item.id}', this.value)">
+        <input type="range" class="capture-slider" id="slider-${item.id}" min="0" max="10" step="0.05" value="1.0" oninput="updateItemCaptureTime('${item.id}', this.value)">
+        <div class="capture-fine-tune" style="display: flex; gap: 4px; justify-content: flex-end; margin-top: 4px;">
+          <button type="button" class="btn-step-frame" onclick="stepItemCaptureTime('${item.id}', -0.5)" title="Step -0.5s">-0.5s</button>
+          <button type="button" class="btn-step-frame" onclick="stepItemCaptureTime('${item.id}', -0.1)" title="Step -0.1s">-0.1s</button>
+          <button type="button" class="btn-step-frame" onclick="stepItemCaptureTime('${item.id}', 0.1)" title="Step +0.1s">+0.1s</button>
+          <button type="button" class="btn-step-frame" onclick="stepItemCaptureTime('${item.id}', 0.5)" title="Step +0.5s">+0.5s</button>
+        </div>
       </div>
       ` : ''}
     </div>
@@ -1162,6 +1309,13 @@ function renderQueueCard(item) {
           </select>
         </div>
         <div class="input-group" style="flex: 1;">
+          <label>Target Software</label>
+          <select id="select-platform-${item.id}" style="background: #111116; color: #fff; border: 1px solid var(--border-panel); border-radius: 6px; padding: 10px; font-family: inherit; font-size: 14px; outline: none; transition: border-color 0.2s; color-scheme: dark;" onchange="updateItemPlatform('${item.id}', this.value)">
+            <option value="pc" ${!item.isMobile ? 'selected' : ''}>🖥️ PC Only (16:9)</option>
+            <option value="mobile" ${item.isMobile ? 'selected' : ''}>📱 Mobile Only (9:16)</option>
+          </select>
+        </div>
+        <div class="input-group" style="flex: 1;">
           <label>Tags (separated by comma)</label>
           <input type="text" id="input-tags-${item.id}" value="${escapeHtml(item.tags)}" placeholder="e.g. dynamic, colorful" oninput="updateItemField('${item.id}', 'tags', this.value)">
         </div>
@@ -1187,6 +1341,35 @@ function renderQueueCard(item) {
   grid.appendChild(card);
 }
 
+// Handler for changing target software on a single card
+function updateItemPlatform(itemId, platform) {
+  const item = uploadQueue.find(i => i.id === itemId);
+  if (!item) return;
+  item.isMobile = (platform === 'mobile');
+  if (item.isMobile) {
+    item.tags = appendMobileTags(item.tags);
+  } else {
+    item.tags = removeMobileTags(item.tags);
+  }
+  const tagsInput = document.getElementById(`input-tags-${itemId}`);
+  if (tagsInput) tagsInput.value = item.tags;
+  
+  const badge = document.getElementById(`badge-platform-${itemId}`);
+  if (badge) {
+    badge.className = item.isMobile ? 'mobile-card-badge' : 'pc-card-badge';
+    badge.innerHTML = item.isMobile ? '📱 9:16 Mobile' : '🖥️ PC 16:9';
+  }
+
+  const preview = document.querySelector(`#card-${itemId} .queue-media-preview`);
+  if (preview) {
+    if (item.isMobile) preview.classList.add('mobile-ratio');
+    else preview.classList.remove('mobile-ratio');
+  }
+
+  // Regenerate thumbnail with appropriate ratio
+  item.thumbnailReady = generateThumbnail(item);
+}
+
 // Generate thumbnail logic — returns a Promise that resolves when the frame is captured
 function generateThumbnail(item) {
   const file = item.file;
@@ -1208,36 +1391,78 @@ function generateThumbnail(item) {
   
   // For videos, seek and draw frame on canvas
   return new Promise((resolve) => {
-    const video = document.createElement('video');
-    video.style.display = 'none';
-    video.preload = 'metadata';
-    video.muted = true;
-    video.playsInline = true;
+    let video = item._scrubVideo;
+    if (!video) {
+      video = document.createElement('video');
+      video.style.display = 'none';
+      video.preload = 'auto';
+      video.muted = true;
+      video.playsInline = true;
+      video.src = URL.createObjectURL(file);
+      item._scrubVideo = video;
+    }
     
-    const objectUrl = URL.createObjectURL(file);
-    video.src = objectUrl;
-    
-    video.addEventListener('loadedmetadata', () => {
-      item.duration = video.duration;
+    const onMeta = () => {
+      item.duration = video.duration || 10;
+      // Auto-detect mobile ratio if not already set explicitly
+      const isPortrait = video.videoHeight > video.videoWidth;
+      const bulkPlat = document.getElementById('bulk-platform') ? document.getElementById('bulk-platform').value : '';
+      if (isPortrait && !item.isMobile && bulkPlat !== 'pc') {
+        item.isMobile = true;
+        item.tags = appendMobileTags(item.tags);
+        const tagsInput = document.getElementById(`input-tags-${item.id}`);
+        if (tagsInput) tagsInput.value = item.tags;
+        const platSelect = document.getElementById(`select-platform-${item.id}`);
+        if (platSelect) platSelect.value = 'mobile';
+        const badge = document.getElementById(`badge-platform-${item.id}`);
+        if (badge) {
+          badge.className = 'mobile-card-badge';
+          badge.innerHTML = '📱 9:16 Mobile';
+        }
+        const previewDiv = document.querySelector(`#card-${item.id} .queue-media-preview`);
+        if (previewDiv) previewDiv.classList.add('mobile-ratio');
+      }
+
       const slider = document.getElementById(`slider-${item.id}`);
       if (slider) {
-        slider.max = video.duration;
-        const defaultTime = Math.min(1.0, video.duration);
-        slider.value = defaultTime;
-        item.captureTime = defaultTime;
-        const display = document.getElementById(`time-display-${item.id}`);
-        if (display) display.innerText = `${defaultTime.toFixed(1)}s`;
-        video.currentTime = defaultTime;
+        slider.max = video.duration || 10;
+        slider.step = "0.05";
+        if (!item._manualFrameChosen) {
+          const defaultTime = Math.min(1.0, video.duration || 1.0);
+          slider.value = defaultTime;
+          item.captureTime = defaultTime;
+          const display = document.getElementById(`time-display-${item.id}`);
+          if (display) display.innerText = `${defaultTime.toFixed(2)}s / ${(video.duration || 0).toFixed(1)}s`;
+          video.currentTime = defaultTime;
+        }
       } else {
-        video.currentTime = Math.min(1.0, video.duration);
+        if (!item._manualFrameChosen) {
+          video.currentTime = Math.min(1.0, video.duration || 1.0);
+        }
       }
-    });
+    };
+
+    if (video.readyState >= 1) {
+      onMeta();
+    } else {
+      video.addEventListener('loadedmetadata', onMeta, { once: true });
+    }
     
-    video.addEventListener('seeked', () => {
+    const onInitialSeeked = () => {
+      // If user already scrubbed the slider manually, DO NOT overwrite with initial default frame!
+      if (item._manualFrameChosen) {
+        resolve();
+        return;
+      }
       try {
         const canvas = document.createElement('canvas');
-        canvas.width = 640;
-        canvas.height = 360;
+        if (item.isMobile || video.videoHeight > video.videoWidth) {
+          canvas.width = 360;
+          canvas.height = 640;
+        } else {
+          canvas.width = 640;
+          canvas.height = 360;
+        }
         const ctx = canvas.getContext('2d');
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
@@ -1246,67 +1471,94 @@ function generateThumbnail(item) {
       } catch (e) {
         console.error('Canvas capture failed:', e);
       } finally {
-        URL.revokeObjectURL(objectUrl);
-        video.remove();
-        resolve(); // always resolve so upload isn't permanently blocked
+        resolve();
       }
-    });
+    };
 
+    video.addEventListener('seeked', onInitialSeeked, { once: true });
     video.addEventListener('error', (e) => {
       console.error('Error loading video for thumbnail:', e);
-      URL.revokeObjectURL(objectUrl);
-      video.remove();
-      resolve(); // resolve anyway
-    });
+      resolve();
+    }, { once: true });
 
-    // Safety timeout: resolve after 10s even if video never fires events
-    setTimeout(() => resolve(), 10000);
+    // Safety timeout: resolve after 8s
+    setTimeout(() => resolve(), 8000);
   });
 }
 
-// Regenerate frame on slider adjustment
+// Precision step adjustment for Admin capture slider (+/- 0.1s, +/- 0.5s)
+function stepItemCaptureTime(itemId, delta) {
+  const slider = document.getElementById(`slider-${itemId}`);
+  if (!slider) return;
+  const current = parseFloat(slider.value) || 0;
+  const max = parseFloat(slider.max) || 10;
+  const next = Math.max(0, Math.min(max, current + delta));
+  slider.value = next.toFixed(2);
+  updateItemCaptureTime(itemId, slider.value);
+}
+
+// Regenerate frame on slider adjustment (debounce/sequence-safe, reusable video element)
 function updateItemCaptureTime(itemId, time) {
   const item = uploadQueue.find(i => i.id === itemId);
   if (!item || item.type !== 'video') return;
   
-  item.captureTime = parseFloat(time);
+  item._manualFrameChosen = true;
+  item.captureTime = Math.max(0, parseFloat(time) || 0);
   
   const display = document.getElementById(`time-display-${itemId}`);
-  if (display) display.innerText = `${item.captureTime.toFixed(1)}s`;
+  if (display) {
+    const total = item.duration ? ` / ${item.duration.toFixed(1)}s` : '';
+    display.innerText = `${item.captureTime.toFixed(2)}s${total}`;
+  }
+
+  // Track sequence so older seeks NEVER overwrite newer seeks (prevents frame reverting!)
+  const seq = (item._seekSeq || 0) + 1;
+  item._seekSeq = seq;
   
-  // Re-generate frame
-  const video = document.createElement('video');
-  video.style.display = 'none';
-  video.muted = true;
-  video.playsInline = true;
+  let video = item._scrubVideo;
+  if (!video) {
+    video = document.createElement('video');
+    video.style.display = 'none';
+    video.preload = 'auto';
+    video.muted = true;
+    video.playsInline = true;
+    video.src = URL.createObjectURL(item.file);
+    item._scrubVideo = video;
+  }
   
-  const objectUrl = URL.createObjectURL(item.file);
-  video.src = objectUrl;
-  
-  video.addEventListener('loadedmetadata', () => {
-    video.currentTime = item.captureTime;
-  });
-  
-  video.addEventListener('seeked', () => {
+  video.onseeked = () => {
+    // Sequence check: ignore if user moved slider again since this seek was initiated
+    if (seq !== item._seekSeq) return;
     try {
       const canvas = document.createElement('canvas');
-      canvas.width = 640;
-      canvas.height = 360;
+      if (item.isMobile || video.videoHeight > video.videoWidth) {
+        canvas.width = 360;
+        canvas.height = 640;
+      } else {
+        canvas.width = 640;
+        canvas.height = 360;
+      }
       const ctx = canvas.getContext('2d');
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
       item.thumbnailDataUrl = dataUrl;
       
       const imgElement = document.getElementById(`img-preview-${itemId}`);
       if (imgElement) imgElement.src = dataUrl;
     } catch (e) {
       console.error('Canvas capture failed on adjust:', e);
-    } finally {
-      URL.revokeObjectURL(objectUrl);
-      video.remove();
     }
-  });
+  };
+  
+  if (video.readyState >= 1) {
+    video.currentTime = item.captureTime;
+  } else {
+    video.addEventListener('loadedmetadata', () => {
+      item.duration = video.duration || 10;
+      video.currentTime = item.captureTime;
+    }, { once: true });
+  }
 }
 
 // Update fields dynamically in state array
@@ -1642,16 +1894,23 @@ async function executeItemUpload(item) {
     // ── STEP C: Save Record to Supabase DB ──
     updateCardStatus(item, 'uploading', 'Saving database record...', 90);
     
+    let finalTags = item.tags || '';
+    if (item.isMobile) {
+      finalTags = appendMobileTags(finalTags);
+    } else {
+      finalTags = removeMobileTags(finalTags);
+    }
+
     const dbRecord = {
       title: item.title,
       creator: item.creator,
       category: item.category || 'General',
-      tags: item.tags,
+      tags: finalTags,
       description: item.desc,
       file_url: mediaPublicUrl,
       thumbnail_url: thumbPublicUrl,
       is_video: item.type === 'video',
-      user_id: 'admin_portal'
+      user_id: 'pavanam926@gmail.com'
     };
 
     // Check if the key being used is the anon key
@@ -1760,6 +2019,7 @@ function renderGallery(items = communityWallpapers) {
     });
     
     const isStruck = wp.is_struck === true;
+    const isMobile = isMobileWallpaper(wp);
 
     card.innerHTML = `
       <div class="gallery-thumb-container">
@@ -1768,6 +2028,7 @@ function renderGallery(items = communityWallpapers) {
           <svg width="24" height="24" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
         </button>
         <span class="category-badge" style="position: absolute; top: 10px; left: 10px; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; background: rgba(0,0,0,0.65); color: #7F56D9; text-transform: uppercase; border: 1px solid rgba(127, 86, 217, 0.3);">${wp.category || 'General'}</span>
+        <span class="gallery-platform-pill ${isMobile ? 'mobile' : 'pc'}">${isMobile ? '📱 Mobile 9:16' : '🖥️ PC 16:9'}</span>
         <span class="provider-badge">${provider}</span>
         ${isStruck ? '<span class="strike-badge">⚠️ STRUCK</span>' : ''}
       </div>
@@ -1812,6 +2073,7 @@ function filterGallery() {
   const query = document.getElementById('gallery-search').value.toLowerCase().trim();
   const type = document.getElementById('gallery-type-filter').value;
   const category = document.getElementById('gallery-category-filter').value;
+  const platform = document.getElementById('gallery-platform-filter') ? document.getElementById('gallery-platform-filter').value : 'all';
   
   const filtered = communityWallpapers.filter(wp => {
     // 1. Text Filter
@@ -1832,8 +2094,14 @@ function filterGallery() {
     if (category !== 'all') {
       matchesCategory = (wp.category || 'General') === category;
     }
+
+    // 4. Platform Filter
+    let matchesPlatform = true;
+    const isMobile = isMobileWallpaper(wp);
+    if (platform === 'mobile') matchesPlatform = isMobile;
+    if (platform === 'pc') matchesPlatform = !isMobile;
     
-    return matchesText && matchesType && matchesCategory;
+    return matchesText && matchesType && matchesCategory && matchesPlatform;
   });
   
   renderGallery(filtered);
@@ -1929,21 +2197,42 @@ function openPreviewModal(url, isVideo, title, desc) {
     // Clear previous handlers to avoid duplicates
     video.onerror = null;
     video.onstalled = null;
+    video.onloadedmetadata = () => {
+      const modal = document.getElementById('preview-modal');
+      if (video.videoHeight > video.videoWidth) {
+        modal.classList.add('portrait-mode');
+      } else {
+        modal.classList.remove('portrait-mode');
+      }
+    };
 
     // Show detailed error if video fails to load
     video.onerror = (e) => {
+      // If the URL is missing /wallpapers/ (due to older bug), try to inject it as a fallback
+      if (url && url.includes('r2.dev') && !url.includes('/wallpapers/') && !video.dataset.retried) {
+        video.dataset.retried = "true";
+        const filename = url.split('/').pop();
+        const fallbackUrl = url.replace(filename, `wallpapers/${filename}`);
+        console.warn('[Modal] Video failed on r2.dev (likely missing directory), retrying with:', fallbackUrl);
+        video.src = fallbackUrl;
+        video.load();
+        video.play().catch(err => console.warn('[Modal] Fallback autoplay blocked:', err.message));
+        return;
+      }
+
       const code = video.error ? video.error.code : '?';
       const msgs = {
         1: 'MEDIA_ERR_ABORTED – Playback aborted.',
         2: 'MEDIA_ERR_NETWORK – Network error while loading video. Check if the R2 bucket has public access enabled.',
         3: 'MEDIA_ERR_DECODE – Video could not be decoded.',
-        4: 'MEDIA_ERR_SRC_NOT_SUPPORTED – Video format not supported or file not found at: ' + url,
+        4: 'MEDIA_ERR_SRC_NOT_SUPPORTED – Video format not supported or file not found at: ' + video.src,
       };
       const msg = msgs[code] || `Unknown error (code ${code})`;
-      console.error('[Modal] Video error:', msg, 'URL:', url);
+      console.error('[Modal] Video error:', msg, 'URL:', video.src);
       showVideoError(msg);
     };
 
+    video.dataset.retried = "";
     video.load();
     video.play().catch(e => console.warn('[Modal] Autoplay blocked:', e.message));
   } else {
@@ -2097,6 +2386,19 @@ function openThumbnailModalOption() {
   const modal = document.getElementById('thumbnail-modal');
   const video = document.getElementById('thumb-capture-video');
   if (modal && video) {
+    video.dataset.retried = "";
+    video.onerror = (e) => {
+      const url = video.src;
+      if (url && url.includes('r2.dev') && !url.includes('/wallpapers/') && !video.dataset.retried) {
+        video.dataset.retried = "true";
+        const filename = url.split('/').pop();
+        const fallbackUrl = url.replace(filename, `wallpapers/${filename}`);
+        console.warn('[ThumbModal] Video failed on r2.dev, retrying with wallpapers directory:', fallbackUrl);
+        video.src = fallbackUrl;
+        video.load();
+        video.play().catch(() => {});
+      }
+    };
     video.src = wp.file_url;
     modal.classList.add('active');
     video.play().catch(() => {});
@@ -3994,6 +4296,299 @@ window.closeGeminiKeyModal = closeGeminiKeyModal;
 window.saveGeminiKeyModal = saveGeminiKeyModal;
 window.toggleModalKeyVisibility = toggleModalKeyVisibility;
 window.autoCategorize = autoCategorize;
+
+// ==========================================
+// 🛡️ WALLPAPER APPROVAL QUEUE SYSTEM
+// ==========================================
+let pendingWallpapers = [];
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+async function fetchPendingApprovals() {
+  if (!supabaseClient) {
+    const loading = document.getElementById('approvals-loading');
+    const empty = document.getElementById('approvals-empty');
+    if (loading) loading.style.display = 'none';
+    if (empty) {
+      empty.style.display = 'flex';
+      const p = empty.querySelector('p');
+      if (p) p.innerText = 'Connect to Supabase in settings first.';
+    }
+    return;
+  }
+
+  const loading = document.getElementById('approvals-loading');
+  const grid = document.getElementById('approvals-grid');
+  const empty = document.getElementById('approvals-empty');
+
+  if (loading) loading.style.display = 'flex';
+  if (grid) grid.style.display = 'none';
+  if (empty) empty.style.display = 'none';
+
+  try {
+    const { data, error } = await supabaseClient
+      .from('community_wallpapers')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    const all = data || [];
+    // Filter pending items: status === 'pending' or tags containing status:pending
+    pendingWallpapers = all.filter(wp => {
+      const rawTags = (wp.tags || '').toLowerCase();
+      return wp.status === 'pending' || rawTags.includes('status:pending');
+    });
+
+    updatePendingApprovalsBadge();
+    renderApprovals(pendingWallpapers);
+  } catch (err) {
+    console.error('Approvals Fetch Error:', err);
+    showToast(`Failed to load pending submissions: ${err.message}`, 'danger');
+    if (loading) loading.style.display = 'none';
+    if (empty) empty.style.display = 'flex';
+  }
+}
+
+function updatePendingApprovalsBadge() {
+  const badge = document.getElementById('pending-approvals-badge');
+  if (!badge) return;
+  if (pendingWallpapers.length > 0) {
+    badge.textContent = pendingWallpapers.length;
+    badge.style.display = 'inline-block';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function renderApprovals(items = pendingWallpapers) {
+  const loading = document.getElementById('approvals-loading');
+  const grid = document.getElementById('approvals-grid');
+  const empty = document.getElementById('approvals-empty');
+
+  if (loading) loading.style.display = 'none';
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  if (items.length === 0) {
+    grid.style.display = 'none';
+    if (empty) empty.style.display = 'flex';
+    return;
+  }
+
+  if (empty) empty.style.display = 'none';
+  grid.style.display = 'grid';
+
+  items.forEach(wp => {
+    let provider = 'Supabase';
+    if (wp.file_url && (wp.file_url.includes('r2.cloudflarestorage.com') || wp.file_url.includes('r2.dev'))) {
+      provider = 'Cloudflare R2';
+    }
+
+    const card = document.createElement('div');
+    card.className = 'gallery-card';
+    card.id = `approval-card-${wp.id}`;
+
+    const createdDate = new Date(wp.created_at).toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+
+    const safeTitle = escapeHtml(wp.title || 'Live Wallpaper').replace(/'/g, "\\'");
+    const thumbSrc = wp.thumbnail_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3C/svg%3E";
+
+    card.innerHTML = `
+      <div class="gallery-thumb-container">
+        <img src="${thumbSrc}" alt="${escapeHtml(wp.title)}" loading="lazy">
+        <button class="gallery-play-btn" onclick="openPreviewModal('${wp.file_url}', '${wp.is_video}', '${safeTitle}', '${escapeHtml(wp.description || '')}')">
+          <svg width="24" height="24" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <span class="category-badge" style="position: absolute; top: 10px; left: 10px; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; background: rgba(0,0,0,0.7); color: #f59e0b; text-transform: uppercase; border: 1px solid rgba(245, 158, 11, 0.4);">${escapeHtml(wp.category || 'General')}</span>
+        <span class="provider-badge" style="background: rgba(245,158,11,0.2); color: #f59e0b; border: 1px solid rgba(245,158,11,0.4);">⏳ PENDING</span>
+      </div>
+      <div class="gallery-card-info">
+        <div class="gallery-card-header">
+          <h4 class="gallery-title" title="${escapeHtml(wp.title)}">${escapeHtml(wp.title)}</h4>
+        </div>
+        <span class="gallery-creator">By ${escapeHtml(wp.creator || wp.author || 'Anonymous')} ${wp.user_id ? `<small style="color:var(--text-muted);font-size:0.75rem;">(${escapeHtml(wp.user_id)})</small>` : ''}</span>
+        <p class="gallery-desc" title="${escapeHtml(wp.description || '')}">${escapeHtml(wp.description || 'User submitted community wallpaper. Waiting for admin approval.')}</p>
+        <div class="gallery-tags-wrapper">
+          ${wp.tags ? wp.tags.split(',').map(t => `<span class="gallery-tag">${escapeHtml(t.trim())}</span>`).join('') : '<span class="gallery-tag">no tags</span>'}
+        </div>
+      </div>
+      <div class="gallery-card-footer" style="display:flex; justify-content:space-between; align-items:center; padding-top:12px; border-top:1px solid rgba(255,255,255,0.06);">
+        <span class="gallery-date">${createdDate}</span>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button class="btn btn-sm" onclick="approveWallpaper('${wp.id}', '${safeTitle}')" style="background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.5); color: #10b981; font-weight: 600; padding: 6px 12px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 4px;" title="Approve & publish live">
+            ✓ Approve
+          </button>
+          <button class="btn btn-sm" onclick="rejectWallpaper('${wp.id}', '${safeTitle}')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.5); color: #ef4444; font-weight: 600; padding: 6px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 4px;" title="Reject submission">
+            ✕ Reject
+          </button>
+        </div>
+      </div>
+    `;
+
+    grid.appendChild(card);
+  });
+}
+
+function filterApprovals() {
+  const query = (document.getElementById('approvals-search')?.value || '').toLowerCase().trim();
+  const type = document.getElementById('approvals-type-filter')?.value || 'all';
+  const category = document.getElementById('approvals-category-filter')?.value || 'all';
+
+  const filtered = pendingWallpapers.filter(wp => {
+    const titleMatch = wp.title && wp.title.toLowerCase().includes(query);
+    const creatorMatch = wp.creator && wp.creator.toLowerCase().includes(query);
+    const tagMatch = wp.tags && wp.tags.toLowerCase().includes(query);
+    const matchesText = !query || (titleMatch || creatorMatch || tagMatch);
+
+    let matchesType = true;
+    if (type === 'video') matchesType = wp.is_video;
+    if (type === 'image') matchesType = !wp.is_video;
+
+    let matchesCategory = true;
+    if (category !== 'all') {
+      matchesCategory = (wp.category || 'General') === category;
+    }
+
+    return matchesText && matchesType && matchesCategory;
+  });
+
+  renderApprovals(filtered);
+}
+
+async function approveWallpaper(id, title) {
+  if (!confirm(`Approve "${title}" and publish live to community gallery?`)) return;
+
+  try {
+    let newTags = '';
+    const item = pendingWallpapers.find(w => w.id === id);
+    if (item && item.tags) {
+      newTags = item.tags.replace(/status:pending/gi, '').replace(/status:rejected/gi, '').replace(/,\s*,/g, ',').trim();
+      newTags = (newTags ? newTags + ', ' : '') + 'status:approved';
+    } else {
+      newTags = 'status:approved';
+    }
+
+    const updates = { status: 'approved', tags: newTags };
+
+    let { error } = await supabaseClient
+      .from('community_wallpapers')
+      .update(updates)
+      .eq('id', id);
+
+    // Fallback if status column doesn't exist
+    if (error && error.message && error.message.includes('status')) {
+      delete updates.status;
+      const res = await supabaseClient
+        .from('community_wallpapers')
+        .update({ tags: newTags })
+        .eq('id', id);
+      error = res.error;
+    }
+
+    if (error) throw error;
+
+    showToast(`✓ "${title}" approved and published to live community gallery!`, 'success');
+
+    pendingWallpapers = pendingWallpapers.filter(w => w.id !== id);
+    updatePendingApprovalsBadge();
+
+    const card = document.getElementById(`approval-card-${id}`);
+    if (card) {
+      card.style.transition = 'all 0.3s ease';
+      card.style.opacity = '0';
+      card.style.transform = 'scale(0.9)';
+      setTimeout(() => {
+        card.remove();
+        if (pendingWallpapers.length === 0) {
+          renderApprovals([]);
+        }
+      }, 300);
+    }
+  } catch (err) {
+    console.error('Approval Error:', err);
+    showToast(`Failed to approve wallpaper: ${err.message}`, 'danger');
+  }
+}
+
+async function rejectWallpaper(id, title) {
+  const reason = prompt(`Why are you rejecting "${title}"?\nThis reason will be shown to the creator.`, "Does not meet community guidelines.");
+  if (reason === null) return; // User cancelled
+
+  try {
+    let newTags = '';
+    const item = pendingWallpapers.find(w => w.id === id);
+    if (item && item.tags) {
+      newTags = item.tags.replace(/status:pending/gi, '').replace(/status:approved/gi, '').replace(/,\s*,/g, ',').trim();
+      newTags = (newTags ? newTags + ', ' : '') + 'status:rejected';
+    } else {
+      newTags = 'status:rejected';
+    }
+
+    // Store the reason in tags, removing commas to prevent breaking tag parsing
+    const safeReason = reason.replace(/,/g, ' ');
+    newTags += `, reject_reason:${safeReason}`;
+
+    const updates = { status: 'rejected', tags: newTags };
+
+    let { error } = await supabaseClient
+      .from('community_wallpapers')
+      .update(updates)
+      .eq('id', id);
+
+    if (error && error.message && error.message.includes('status')) {
+      delete updates.status;
+      const res = await supabaseClient
+        .from('community_wallpapers')
+        .update({ tags: newTags })
+        .eq('id', id);
+      error = res.error;
+    }
+
+    if (error) throw error;
+
+    showToast(`"${title}" has been rejected.`, 'info');
+
+    pendingWallpapers = pendingWallpapers.filter(w => w.id !== id);
+    updatePendingApprovalsBadge();
+
+    const card = document.getElementById(`approval-card-${id}`);
+    if (card) {
+      card.style.transition = 'all 0.3s ease';
+      card.style.opacity = '0';
+      card.style.transform = 'scale(0.9)';
+      setTimeout(() => {
+        card.remove();
+        if (pendingWallpapers.length === 0) {
+          renderApprovals([]);
+        }
+      }, 300);
+    }
+  } catch (err) {
+    console.error('Reject Error:', err);
+    showToast(`Failed to reject wallpaper: ${err.message}`, 'danger');
+  }
+}
+
+window.fetchPendingApprovals = fetchPendingApprovals;
+window.filterApprovals = filterApprovals;
+window.approveWallpaper = approveWallpaper;
+window.rejectWallpaper = rejectWallpaper;
+window.stepItemCaptureTime = stepItemCaptureTime;
+window.updateItemCaptureTime = updateItemCaptureTime;
+
 
 
 

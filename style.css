@@ -650,6 +650,25 @@ select:focus {
   transform: scale(1.2);
 }
 
+.btn-step-frame {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text-secondary);
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.btn-step-frame:hover {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
 .queue-details-edit {
   display: flex;
   flex-direction: column;
@@ -1114,6 +1133,37 @@ select:focus {
   margin-bottom: 8px;
 }
 
+/* Portrait Mode Adapation */
+#preview-modal.portrait-mode .modal-content {
+  display: flex;
+  flex-direction: row;
+  max-width: 900px;
+}
+#preview-modal.portrait-mode .modal-video-wrapper {
+  aspect-ratio: 9/16;
+  width: auto;
+  height: 85vh;
+  max-height: 800px;
+  flex-shrink: 0;
+}
+#preview-modal.portrait-mode .modal-info {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 768px) {
+  #preview-modal.portrait-mode .modal-content {
+    flex-direction: column;
+  }
+  #preview-modal.portrait-mode .modal-video-wrapper {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 9/16;
+  }
+}
+
 .modal-info p {
   color: var(--text-secondary);
   font-size: 0.9rem;
@@ -1422,4 +1472,85 @@ select:focus {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+/* ── Mobile 9:16 Upload & Card Styles ────────────────────────── */
+.btn-mobile {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #fff;
+  border: 1px solid rgba(16, 185, 129, 0.5);
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-mobile:hover {
+  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.45);
+  color: #fff;
+}
+
+.mobile-card-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.2));
+  border: 1px solid rgba(16, 185, 129, 0.5);
+  color: #34d399;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.pc-card-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(127, 86, 217, 0.15);
+  border: 1px solid rgba(127, 86, 217, 0.35);
+  color: #c4b5fd;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.gallery-platform-pill {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.gallery-platform-pill.mobile {
+  background: rgba(6, 78, 59, 0.85);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.gallery-platform-pill.pc {
+  background: rgba(15, 23, 42, 0.85);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.queue-media-preview.mobile-ratio .preview-container {
+  aspect-ratio: 9 / 16;
+  max-width: 140px;
+  margin: 0 auto;
+}
+
 
